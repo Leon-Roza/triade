@@ -511,6 +511,8 @@
       <div class="det-actions">
         <button class="btn primary" id="useKeyBtn">✓ Usar esta tonalidade no site</button>
         <button class="btn" id="saveCifraBtn">💾 Salvar cifra</button>
+        <button class="btn" id="detTabBtn">⬇ Tab</button>
+        <button class="btn" id="detMidiBtn">⬇ MIDI</button>
       </div>
       <div class="chordlist" id="chordList"></div>
     </div>
@@ -1522,7 +1524,7 @@ function saveDetected(){
   if(!state.user){ pendingAction = saveDetected; openAuth(); return; }
   if(CONFIG.supabaseUrl && !isPro() && readSaved().length >= 3){ requirePro('No plano Free você salva até 3. Assine o Pro para salvar sem limite.'); return; }
   const res=lastDetection;
-  const chords=res.segments.filter(s=>s.quality!=='N').map(s=>({ name:segName(s), degree:'', notes:chordNotesOf(s.root,s.quality) }));
+  const chords=res.segments.filter(s=>s.quality!=='N').map(s=>({ name:segName(s), degree:'', notes:chordNotesOf(s.root,s.quality), start:s.start, end:s.end }));
   if(!chords.length){ toast('Nada para salvar — nenhum acorde identificado.'); return; }
   const list=readSaved();
   list.unshift({ kind:'cifra', name:'Cifra do áudio', tonic:ROOT_LABELS[res.key.root], mode:res.key.mode,
@@ -1534,6 +1536,8 @@ function setupDetector(){
   document.getElementById('audioFile').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) analyzeFile(f); });
   document.getElementById('useKeyBtn').addEventListener('click', useDetectedKey);
   document.getElementById('saveCifraBtn').addEventListener('click', saveDetected);
+  document.getElementById('detTabBtn').addEventListener('click', exportDetTab);
+  document.getElementById('detMidiBtn').addEventListener('click', exportDetMidi);
 }
 
 /* ============ MODO COMPOSITOR ============ */
@@ -1753,6 +1757,63 @@ function exportMidi(){
 function exportMidiSaved(p){
   if(!requirePro('Exportar é recurso Pro.')) return;
   saveMidi('melodia-'+p.tonic+'.mid', melodyMidi(p));
+}
+
+/* ----- Exportar cifra/áudio enviado (tab + MIDI) ----- */
+function currentCifra(){
+  if(!lastDetection) return null;
+  return { tonic: ROOT_LABELS[lastDetection.key.root], mode: lastDetection.key.mode, bpm: player.bpm,
+           chords: lastDetection.segments.filter(s=>s.quality!=='N').map(s=>({ name:segName(s), notes:chordNotesOf(s.root,s.quality), start:s.start, end:s.end })) };
+}
+function cifraTab(c){
+  const notes=(c.chords||[]);
+  const order=[5,4,3,2,1,0], labels={5:'e',4:'B',3:'G',2:'D',1:'A',0:'E'};
+  const out=['TRÍADE — Tablatura (cifra do áudio)'];
+  out.push('Tonalidade: '+c.tonic+' '+(c.mode==='maior'?'Maior':'Menor')+' · '+notes.length+' acordes');
+  out.push('');
+  let cursor=0;
+  notes.forEach(ch=>{
+    const start=(ch.start!=null)?ch.start:cursor;
+    const end=(ch.end!=null)?ch.end:start+2; cursor=end;
+    out.push('  '+ch.name+'   ('+fmtTime(start)+'–'+fmtTime(end)+')   '+ch.notes.join(' '));
+    const smap={};
+    ch.notes.forEach(n=>{ const p=noteToPosition(48+parsePC(n)); smap[p.s]=p.fret; });
+    order.forEach(si=>{ out.push(labels[si]+'|'+(smap[si]!=null?tabCell(smap[si]):'---')+'|'); });
+    out.push('');
+  });
+  return out.join('\n');
+}
+function cifraMidi(c){
+  const TPQ=480, bpm=c.bpm||90, tempo=Math.round(60000000/bpm);
+  const toTicks=sec=>Math.round((sec||0)*(bpm/60)*TPQ);
+  const t0=[{tick:0, data:[0xFF,0x51,0x03,(tempo>>16)&0xff,(tempo>>8)&0xff,tempo&0xff]},
+            {tick:0, data:[0xFF,0x58,0x04,4,2,24,8]}];
+  const acc=[]; let cursor=0;
+  (c.chords||[]).forEach(ch=>{
+    const start=(ch.start!=null)?ch.start:cursor;
+    const end=(ch.end!=null)?ch.end:start+2; cursor=end;
+    const s=toTicks(start), e=Math.max(s+30, toTicks(end));
+    ch.notes.map(n=>48+parsePC(n)).forEach(m=>{
+      const midi=Math.max(0,Math.min(127,m));
+      acc.push({tick:s, prio:1, data:[0x90, midi, 80]});
+      acc.push({tick:e, prio:0, data:[0x80, midi, 0]});
+    });
+  });
+  const total=acc.length? Math.max(...acc.map(x=>x.tick))+1 : 0;
+  const header=midiChunk('MThd', [0x00,0x01, 0x00,0x02, (TPQ>>8)&0xff, TPQ&0xff]);
+  const tr0=midiChunk('MTrk', midiTrack(t0, 0));
+  const tr1=midiChunk('MTrk', midiTrack(acc, total));
+  return new Uint8Array([...header, ...tr0, ...tr1]);
+}
+function exportDetTab(){
+  if(!requirePro('Exportar é recurso Pro.')) return;
+  const c=currentCifra(); if(!c || !c.chords.length){ toast('Analise um áudio primeiro.'); return; }
+  download('tablatura-cifra.txt', cifraTab(c));
+}
+function exportDetMidi(){
+  if(!requirePro('Exportar é recurso Pro.')) return;
+  const c=currentCifra(); if(!c || !c.chords.length){ toast('Analise um áudio primeiro.'); return; }
+  saveMidi('cifra-'+c.tonic+'.mid', cifraMidi(c));
 }
 function noteToPosition(midi){
   const tuning=[40,45,50,55,59,64];
@@ -2062,15 +2123,17 @@ function renderSaved(){
         '<div class="cifra-chords">'+p.chords.map(c=>'<span class="cifra-play">'+c.name+'</span>').join('')+'</div>'+
         '<div class="acts">'+
           '<button class="btn" data-a="play">▶ Tocar</button>'+
+          '<button class="btn" data-a="tab">Tab</button>'+
+          '<button class="btn" data-a="midi">MIDI</button>'+
           '<button class="btn" data-a="txt">Cifra</button>'+
           '<button class="btn" data-a="print">PDF</button>'+
-          '<button class="btn" data-a="json">JSON</button>'+
           '<button class="btn" data-a="del">Excluir</button>'+
         '</div>';
       el.querySelector('[data-a="play"]').addEventListener('click', function(){ playCifra(p, el, this); });
+      el.querySelector('[data-a="tab"]').addEventListener('click',()=>{ if(!requirePro('Exportar é recurso Pro.')) return; download('tablatura-cifra.txt', cifraTab(p)); });
+      el.querySelector('[data-a="midi"]').addEventListener('click',()=>{ if(!requirePro('Exportar é recurso Pro.')) return; saveMidi('cifra-'+p.tonic+'.mid', cifraMidi(p)); });
       el.querySelector('[data-a="txt"]').addEventListener('click',()=>exportCifra(p));
       el.querySelector('[data-a="print"]').addEventListener('click',()=>printPreset(p));
-      el.querySelector('[data-a="json"]').addEventListener('click',()=>exportJson(p));
       el.querySelector('[data-a="del"]').addEventListener('click',()=>{ stopCifra(); const l=readSaved(); l.splice(idx,1); writeSaved(l); renderSaved(); toast('Removida.'); });
       wrap.appendChild(el);
       return;
