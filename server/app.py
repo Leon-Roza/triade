@@ -136,8 +136,6 @@ def checkout(req: CheckoutRequest):
         "back_urls": {"success": SITE_URL, "pending": SITE_URL, "failure": SITE_URL},
         "auto_return": "approved",
     }
-    if req.email:
-        body["payer"] = {"email": req.email}
     if BACKEND_URL:
         body["notification_url"] = BACKEND_URL + "/webhooks/mercadopago"
 
