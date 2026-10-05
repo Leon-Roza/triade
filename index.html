@@ -200,12 +200,20 @@
   .fb-legend .m.tone{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.5)}
   .fb-hint{margin-left:auto}
 
+  /* SOM / TIMBRE */
+  .sound{margin-top:6px}
+  .sound-row{display:grid;grid-template-columns:1.3fr 1fr;gap:24px}
+  .sound-group h2{margin-bottom:12px}
+  #timbreBtns{grid-template-columns:1fr;margin-bottom:0}
+  .sound-group .tempo-row{margin-top:14px}
+
   footer{margin-top:60px;text-align:center;color:var(--muted);font-size:12px;line-height:1.7}
 
   @media (max-width:900px){
     .controls{grid-template-columns:1fr}
     .stage{grid-template-columns:1fr}
     .progression{grid-template-columns:1fr}
+    .sound-row{grid-template-columns:1fr}
     .hub .root{font-size:52px}
     .brand h1{font-size:24px}
   }
@@ -319,6 +327,28 @@
   </section>
 
   <div class="grid-title">
+    <h2>Som do instrumento</h2>
+    <span id="timbreName">—</span>
+  </div>
+  <section class="sound panel">
+    <div class="sound-row">
+      <div class="sound-group">
+        <h2>Timbre</h2>
+        <div class="rhythms" id="timbreBtns"></div>
+      </div>
+      <div class="sound-group">
+        <h2>Efeitos (guitarra)</h2>
+        <label class="check"><input type="checkbox" id="distChk" /> Distorção</label>
+        <div class="tempo-row">
+          <label for="drive">Drive</label>
+          <input type="range" id="drive" min="0" max="100" step="1" value="55" />
+          <span id="driveVal" class="tempo-val">55%</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="grid-title">
     <h2>Braço do instrumento</h2>
     <span id="fbChord">—</span>
   </div>
@@ -386,7 +416,7 @@ function spellScale(tonic, intervals){
 }
 
 /* ============ ESTADO ============ */
-const state = { tonic: TONICS[0], mode: 'maior', selected: 0, rhythm: 'baixoAcorde', progression: null };
+const state = { tonic: TONICS[0], mode: 'maior', selected: 0, rhythm: 'baixoAcorde', progression: null, timbre: 'nylon', distortion: false, drive: 0.55 };
 let current = {};
 
 function build(){
@@ -570,38 +600,16 @@ function buildControls(){
 
 /* ============ ÁUDIO ============ */
 let audioCtx = null;
-function midiOf(name, octave){
-  const m = name.match(/^([A-G])([#b]?)/);
-  return (octave+1)*12 + NOTE_INDEX[m[1]+m[2]];
-}
+
 function playChord(chord){
-  try{
-    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    if(audioCtx.state === 'suspended') audioCtx.resume();
-    const now = audioCtx.currentTime;
-    const freqs = chord.notes.map(n=>{
-      let midi = midiOf(n, 4);
-      return 440 * Math.pow(2, (midi-69)/12);
-    });
-    freqs.forEach((freq,idx)=>{
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.value = freq;
-      const t = now + idx*0.055;
-      gain.gain.setValueAtTime(0.0001, t);
-      gain.gain.linearRampToValueAtTime(0.16, t+0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t+1.25);
-      osc.connect(gain).connect(audioCtx.destination);
-      osc.start(t);
-      osc.stop(t+1.3);
-    });
-  }catch(e){ /* áudio indisponível */ }
+  try{ ensureCtx(); }catch(e){ return; }
+  const v = voicingOf(chord);
+  const now = audioCtx.currentTime + 0.02;
+  v.midis.forEach((m,i)=> pluckVoice(m, now + 0.012*i, 1.8, 0.09));
+  pluckVoice(v.bass, now, 1.8, 0.19);
 }
 function strumTonality(){
-  current.chords.forEach((c,i)=>{
-    setTimeout(()=>playChord(c), i*620);
-  });
+  current.chords.forEach((c,i)=> setTimeout(()=>playChord(c), i*620));
 }
 
 document.getElementById('playBtn').addEventListener('click', ()=>playChord(current.chords[state.selected]));
@@ -684,35 +692,164 @@ function voicingOf(chord){
   }
   return { bass: base-12, midis };
 }
+let master = null;
+
+const TIMBRES = {
+  nylon: {
+    name:'Violão (nylon)',
+    bright:0.45, damp:0.56, sustain:4.2, maxDur:3.4, lowpass:4800,
+    peaks:[{f:110,g:5,q:1.2},{f:210,g:3,q:1.0},{f:420,g:-2.5,q:1.6}]
+  },
+  aco: {
+    name:'Violão (aço)',
+    bright:0.78, damp:0.50, sustain:5.0, maxDur:3.8, lowpass:7200,
+    peaks:[{f:100,g:4,q:1.1},{f:190,g:2.5,q:1.0},{f:2400,g:2.5,q:1.4}]
+  },
+  eletrica: {
+    name:'Guitarra (elétrica)',
+    bright:0.85, damp:0.48, sustain:5.6, maxDur:4.0, lowpass:6000,
+    peaks:[{f:130,g:3,q:1.1},{f:900,g:1.5,q:1.2},{f:2600,g:2,q:1.3}]
+  }
+};
+
 function ensureCtx(){
-  audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+  if(!audioCtx){
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    master = audioCtx.createDynamicsCompressor();
+    master.threshold.value = -12;
+    master.knee.value = 24;
+    master.ratio.value = 5;
+    master.attack.value = 0.003;
+    master.release.value = 0.25;
+    const out = audioCtx.createGain();
+    out.gain.value = 0.9;
+    master.connect(out).connect(audioCtx.destination);
+  }
   if(audioCtx.state === 'suspended') audioCtx.resume();
 }
+function outputNode(){ return master || audioCtx.destination; }
+
 function tone(midi, t, dur, gain, type){
   const osc = audioCtx.createOscillator();
   const g = audioCtx.createGain();
   osc.type = type || 'triangle';
   osc.frequency.value = 440 * Math.pow(2, (midi-69)/12);
-  const a = 0.012;
+  const a = 0.006;
   g.gain.setValueAtTime(0.0001, t);
   g.gain.linearRampToValueAtTime(gain, t + a);
   g.gain.exponentialRampToValueAtTime(0.0001, t + Math.max(a + 0.06, dur));
-  osc.connect(g).connect(audioCtx.destination);
+  osc.connect(g).connect(outputNode());
   osc.start(t);
   osc.stop(t + dur + 0.06);
 }
+
+/* ===== síntese de corda dedilhada (Karplus-Strong) ===== */
+const pluckCache = new Map();
+function getPluckBuffer(midi, timbre){
+  const key = midi + '|' + timbre;
+  if(pluckCache.has(key)) return pluckCache.get(key);
+  const cfg = TIMBRES[timbre] || TIMBRES.nylon;
+  const sr = audioCtx.sampleRate;
+  const freq = 440 * Math.pow(2, (midi-69)/12);
+  const total = Math.max(64, Math.floor(Math.min(cfg.maxDur, cfg.sustain * 0.85) * sr));
+  const N = Math.max(2, Math.round(sr / freq));
+  const ring = new Float32Array(N);
+  let lp = 0, dc = 0;
+  for(let i=0;i<N;i++){
+    const white = Math.random()*2 - 1;
+    lp += cfg.bright * (white - lp);
+    ring[i] = lp;
+    dc += lp;
+  }
+  dc /= N;
+  let max = 0;
+  for(let i=0;i<N;i++){ ring[i] -= dc; const a = Math.abs(ring[i]); if(a > max) max = a; }
+  if(max > 0) for(let i=0;i<N;i++) ring[i] /= max;
+  const decay = Math.exp(Math.log(0.001) / (freq * cfg.sustain));
+  const d = cfg.damp;
+  const out = new Float32Array(total);
+  let idx = 0;
+  for(let i=0;i<total;i++){
+    const cur = ring[idx];
+    out[i] = cur;
+    const nxt = ring[(idx+1) % N];
+    ring[idx] = decay * ((1 - d) * cur + d * nxt);
+    idx = (idx + 1) % N;
+  }
+  const fi = Math.max(1, Math.floor(0.0015 * sr));
+  for(let i=0;i<fi;i++) out[i] *= i / fi;
+  const fo = Math.max(1, Math.floor(0.025 * sr));
+  for(let i=0;i<fo;i++) out[total-1-i] *= i / fo;
+  const buf = audioCtx.createBuffer(1, total, sr);
+  buf.copyToChannel(out, 0);
+  pluckCache.set(key, buf);
+  return buf;
+}
+
+function distCurve(k){
+  const n = 1024, curve = new Float32Array(n);
+  const drive = 1 + k * 45;
+  const norm = Math.tanh(drive);
+  for(let i=0;i<n;i++){
+    const x = (i * 2 / (n - 1)) - 1;
+    curve[i] = Math.tanh(drive * x) / norm;
+  }
+  return curve;
+}
+
+function pluckVoice(midi, time, dur, vel){
+  if(!audioCtx) return;
+  const cfg = TIMBRES[state.timbre] || TIMBRES.nylon;
+  const src = audioCtx.createBufferSource();
+  src.buffer = getPluckBuffer(midi, state.timbre);
+
+  const lp = audioCtx.createBiquadFilter();
+  lp.type = 'lowpass'; lp.frequency.value = cfg.lowpass; lp.Q.value = 0.5;
+
+  const body = cfg.peaks.map(p=>{
+    const pk = audioCtx.createBiquadFilter();
+    pk.type = 'peaking'; pk.frequency.value = p.f; pk.gain.value = p.g; pk.Q.value = p.q;
+    return pk;
+  });
+
+  const g = audioCtx.createGain();
+  const end = time + Math.max(0.03, dur - 0.10);
+  g.gain.setValueAtTime(0.0001, time);
+  g.gain.linearRampToValueAtTime(vel, time + 0.004);
+  g.gain.setValueAtTime(vel, end);
+  g.gain.linearRampToValueAtTime(0.0001, time + dur + 0.05);
+
+  const nodes = [src, lp, ...body, g];
+
+  if(state.distortion && state.timbre !== 'nylon'){
+    const pre = audioCtx.createGain(); pre.gain.value = 1 + state.drive * 9;
+    const ws = audioCtx.createWaveShaper(); ws.curve = distCurve(state.drive); ws.oversample = '4x';
+    const cab = audioCtx.createBiquadFilter(); cab.type = 'lowpass'; cab.frequency.value = 3600; cab.Q.value = 0.8;
+    const hp = audioCtx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 90;
+    const post = audioCtx.createGain(); post.gain.value = 0.55 / (1 + state.drive);
+    nodes.push(pre, ws, cab, hp, post);
+  }
+
+  for(let i=0;i<nodes.length-1;i++) nodes[i].connect(nodes[i+1]);
+  nodes[nodes.length-1].connect(outputNode());
+
+  src.start(time);
+  src.stop(time + Math.min(src.buffer.duration, dur + 0.06));
+}
+
 function playChordAt(chord, t, dur){
   const v = voicingOf(chord);
-  v.midis.forEach((m,i)=>tone(m, t + i*0.004, Math.min(dur,1.7), 0.11, 'triangle'));
+  const hit = Math.min(dur, 2.2);
+  v.midis.forEach((m,i)=> pluckVoice(m, t + i*0.008, hit, 0.085));
 }
 function playBassAt(chord, t, dur){
   const v = voicingOf(chord);
-  tone(v.bass, t, Math.min(dur,1.7), 0.20, 'sine');
+  pluckVoice(v.bass, t, Math.min(dur, 2.2), 0.19);
 }
 function playArpAt(chord, role, t, dur){
   const v = voicingOf(chord);
   const m = role === 'b' ? v.bass : v.midis[role];
-  tone(m, t, Math.min(dur,1.2), 0.15, 'triangle');
+  pluckVoice(m, t, Math.min(dur, 1.4), 0.12);
 }
 function metroClick(t, accent){
   tone(accent ? 84 : 81, t, 0.05, accent ? 0.09 : 0.05, 'square');
@@ -865,9 +1002,44 @@ function buildProgressionControls(){
   document.getElementById('stopProgBtn').addEventListener('click', stopProgression);
 }
 
+/* ============ CONTROLES DE SOM ============ */
+function updateTimbreLabel(){
+  const t = TIMBRES[state.timbre];
+  document.getElementById('timbreName').textContent =
+    t.name + (state.distortion && state.timbre !== 'nylon' ? '  +  distorção' : '');
+}
+function buildSoundControls(){
+  const tb = document.getElementById('timbreBtns');
+  Object.entries(TIMBRES).forEach(([key,t])=>{
+    const b = document.createElement('button');
+    b.className = 'rhythm-btn' + (key===state.timbre ? ' active' : '');
+    b.textContent = t.name;
+    b.addEventListener('click', ()=>{
+      state.timbre = key;
+      document.querySelectorAll('#timbreBtns .rhythm-btn').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      updateTimbreLabel();
+    });
+    tb.appendChild(b);
+  });
+
+  const dc = document.getElementById('distChk');
+  dc.checked = state.distortion;
+  dc.addEventListener('change', ()=>{ state.distortion = dc.checked; updateTimbreLabel(); });
+
+  const dr = document.getElementById('drive');
+  const dv = document.getElementById('driveVal');
+  dr.value = Math.round(state.drive * 100);
+  dv.textContent = dr.value + '%';
+  dr.addEventListener('input', ()=>{ state.drive = (+dr.value)/100; dv.textContent = dr.value + '%'; });
+
+  updateTimbreLabel();
+}
+
 /* ============ START ============ */
 buildControls();
 buildProgressionControls();
+buildSoundControls();
 build();
 </script>
 </body>
