@@ -1461,9 +1461,12 @@ function setupDetector(){
 }
 
 /* ===== checkout (Mercado Pago) =====
-   Crie um "Link de pagamento" (ou Assinatura) no Mercado Pago para cada plano e
-   cole as URLs abaixo. Ex.: 'https://mpago.la/xxxxxxx'.
-   Enquanto estiver vazio, o botão abre um e-mail de contato. */
+   Links de PAGAMENTO (cobrança única, NÃO renovam automaticamente):
+     pro_mensal -> paga 1 mês; pro_anual -> paga 1 ano.
+   Studio: vendido por "fale com vendas" (e-mail); preencha 'studio' se um dia
+   quiser um link direto. Enquanto um campo estiver vazio, o botão abre o e-mail
+   triadestudio@usetriade.com.br. Para renovação automática, use Assinatura
+   (preapproval) do Mercado Pago. */
 const CHECKOUT = { pro_mensal:'https://mpago.la/1vHWRFX', pro_anual:'https://mpago.la/1knT8cu', studio:'' };
 let currentCycle = 'mensal';
 

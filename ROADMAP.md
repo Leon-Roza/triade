@@ -10,7 +10,10 @@
   (A → IPs do GitHub Pages; `www` → CNAME `leon-roza.github.io`). Site no ar em
   `http://usetriade.com.br`; **HTTPS aguardando emissão do certificado** pelo
   GitHub (ativar "Enforce HTTPS" assim que estiver pronto).
-- **Pagamento:** **Mercado Pago** (Link de Pagamento / Assinatura).
+- **Pagamento:** **Mercado Pago** (Link de Pagamento).
+  - `pro_mensal` e `pro_anual` = **cobrança única** (não renovam sozinhos).
+  - **Studio** = vendido via **"fale com vendas"** (e-mail `triadestudio@usetriade.com.br`).
+  - Renovação automática, se desejada no futuro, exige **Assinatura (preapproval)**.
 - **Conta de usuário:** **local/demo** por enquanto (localStorage); migrar para
   Supabase quando precisar de login real e progressões na nuvem.
 - **Já implementado no site:** seção de planos com toggle mensal/anual, checkout
