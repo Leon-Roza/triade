@@ -439,10 +439,11 @@
       <button class="btn primary" id="genMelodyBtn">🎼 Gerar melodia</button>
       <button class="btn" id="variationBtn">🔀 Variação</button>
       <button class="btn" id="playMelodyBtn">▶ Tocar</button>
+      <button class="btn" id="playMelodySoloBtn">▶ Só melodia</button>
       <button class="btn" id="stopMelodyBtn" disabled>■ Parar</button>
       <button class="btn" id="saveMelodyBtn">💾 Salvar</button>
-      <button class="btn" id="exportMelodyBtn">⬇ .txt</button>
       <button class="btn" id="exportTabBtn">⬇ Tab</button>
+      <button class="btn" id="exportMidiBtn">⬇ MIDI</button>
     </div>
     <div class="melody" id="melodyOut"></div>
   </section>
@@ -641,7 +642,7 @@ function spellScale(tonic, intervals){
 }
 
 /* ============ ESTADO ============ */
-const state = { tonic: TONICS[0], mode: 'maior', selected: 0, rhythm: 'baixoAcorde', progression: null, timbre: 'nylon', distortion: false, drive: 0.55, user: null, plan: 'free', expiresAt: null, freeUsed: 0, density: 'media', register: 'media', style: 'cantavel', melody: null };
+const state = { tonic: TONICS[0], mode: 'maior', selected: 0, rhythm: 'baixoAcorde', progression: null, timbre: 'nylon', distortion: false, drive: 0.55, user: null, plan: 'free', expiresAt: null, freeUsed: 0, density: 'media', register: 'grave', style: 'cantavel', melody: null };
 let current = {};
 
 function build(){
@@ -1643,7 +1644,7 @@ function stopMelody(){
   const pb=document.getElementById('playMelodyBtn'); if(pb) pb.disabled=false;
   const sb=document.getElementById('stopMelodyBtn'); if(sb) sb.disabled=true;
 }
-function playMelody(){
+function playMelody(solo){
   if(!state.melody) generateMelody();
   if(!state.melody) return;
   stopMelody(); stopCifra();
@@ -1653,7 +1654,7 @@ function playMelody(){
   const beatMs = 60000/(bpm||90);
   const barMs = beatMs*m.beats;
   const stepMs = beatMs/2;
-  const acc = document.getElementById('accChk') ? document.getElementById('accChk').checked : true;
+  const acc = !solo && (document.getElementById('accChk') ? document.getElementById('accChk').checked : true);
   const events=[];
   m.chords.forEach((c,bar)=>{
     if(acc){
@@ -1682,23 +1683,76 @@ function playMelody(){
   document.getElementById('playMelodyBtn').disabled=true;
   document.getElementById('stopMelodyBtn').disabled=false;
 }
-function melodyText(m){
-  const mode = m.mode==='maior'?'Maior':'Menor';
-  const notes = m.notes || m.melody || [];
-  let s='TRÍADE — Melodia\nTonalidade: '+m.tonic+' '+mode+'\nAndamento: '+m.bpm+' BPM · '+m.beats+'/4\n\n';
-  m.chords.forEach((c,bar)=>{
-    s+='Compasso '+(bar+1)+'  ['+c.name+']  '+notes.filter(n=>n.bar===bar).map(n=>n.rest?'-':n.name).join(' ')+'\n';
-  });
-  return s;
+/* ----- Exportar MIDI (Standard MIDI File, formato 1: melodia + acompanhamento) ----- */
+function vlq(value){
+  let buf = value & 0x7F;
+  const out = [];
+  value = Math.floor(value/128);
+  while(value > 0){ out.unshift((value & 0x7F) | 0x80); value = Math.floor(value/128); }
+  out.push(buf);
+  return out;
 }
-function exportMelody(){
+function midiChunk(id, data){
+  const len=data.length;
+  return [id.charCodeAt(0),id.charCodeAt(1),id.charCodeAt(2),id.charCodeAt(3),
+          (len>>>24)&0xff,(len>>>16)&0xff,(len>>>8)&0xff,len&0xff, ...data];
+}
+function midiTrack(events, endTick){
+  events = events.slice().sort((a,b)=> (a.tick-b.tick) || ((a.prio||0)-(b.prio||0)));
+  const bytes=[]; let last=0;
+  events.forEach(ev=>{ bytes.push(...vlq(ev.tick-last), ...ev.data); last=ev.tick; });
+  bytes.push(...vlq(Math.max(0,endTick-last)), 0xFF,0x2F,0x00);
+  return bytes;
+}
+function melodyMidi(m){
+  const TPQ=480, beats=m.beats||4, barTicks=beats*TPQ;
+  const notes = m.notes || m.melody || [];
+  const tempo = Math.round(60000000/(m.bpm||90));
+  const t0=[ {tick:0, data:[0xFF,0x51,0x03,(tempo>>16)&0xff,(tempo>>8)&0xff,tempo&0xff]},
+             {tick:0, data:[0xFF,0x58,0x04,beats,2,24,8]} ];
+  const mel=[];
+  m.chords.forEach((c,bar)=>{
+    const bn=notes.filter(n=>n.bar===bar && !n.rest).sort((a,b)=>a.beat-b.beat);
+    bn.forEach((n,i)=>{
+      const start=bar*barTicks + Math.round(n.beat*TPQ);
+      const nb = bn[i+1] ? (bn[i+1].beat-n.beat) : (beats-n.beat);
+      const dur = Math.max(60, Math.round((nb>0?nb:0.5)*TPQ*0.95));
+      const midi=Math.max(0,Math.min(127, n.midi|0));
+      mel.push({tick:start, prio:1, data:[0x90, midi, 96]});
+      mel.push({tick:start+dur, prio:0, data:[0x80, midi, 0]});
+    });
+  });
+  const acc=[];
+  m.chords.forEach((c,bar)=>{
+    const start=bar*barTicks, end=start+barTicks;
+    c.notes.map(parsePC).forEach(pc=>{
+      const midi=48+pc;
+      acc.push({tick:start, prio:1, data:[0x91, midi, 64]});
+      acc.push({tick:end, prio:0, data:[0x81, midi, 0]});
+    });
+  });
+  const totalTicks=(m.chords.length||1)*barTicks;
+  const header = midiChunk('MThd', [0x00,0x01, 0x00,0x03, (TPQ>>8)&0xff, TPQ&0xff]);
+  const tr0 = midiChunk('MTrk', midiTrack(t0, 0));
+  const tr1 = midiChunk('MTrk', midiTrack(mel, totalTicks));
+  const tr2 = midiChunk('MTrk', midiTrack(acc, totalTicks));
+  return new Uint8Array([...header, ...tr0, ...tr1, ...tr2]);
+}
+function saveMidi(filename, u8){
+  const blob=new Blob([u8],{type:'audio/midi'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+}
+function exportMidi(){
   if(!state.melody){ toast('Gere uma melodia primeiro.'); return; }
   if(!requirePro('Exportar é recurso Pro.')) return;
-  download('melodia-'+state.tonic.label+'.txt', melodyText(state.melody));
+  saveMidi('melodia-'+state.tonic.label+'.mid', melodyMidi(state.melody));
 }
-function exportMelodySaved(p){
+function exportMidiSaved(p){
   if(!requirePro('Exportar é recurso Pro.')) return;
-  download('melodia-'+p.tonic+'.txt', melodyText(p));
+  saveMidi('melodia-'+p.tonic+'.mid', melodyMidi(p));
 }
 function noteToPosition(midi){
   const tuning=[40,45,50,55,59,64];
@@ -1785,11 +1839,12 @@ function buildComposerControls(){
   });
   document.getElementById('genMelodyBtn').addEventListener('click', ()=>generateMelody());
   document.getElementById('variationBtn').addEventListener('click', ()=>generateMelody());
-  document.getElementById('playMelodyBtn').addEventListener('click', ()=>{ if(!state.melody) generateMelody(); if(state.melody) playMelody(); });
+  document.getElementById('playMelodyBtn').addEventListener('click', ()=>{ if(!state.melody) generateMelody(); if(state.melody) playMelody(false); });
+  document.getElementById('playMelodySoloBtn').addEventListener('click', ()=>{ if(!state.melody) generateMelody(); if(state.melody) playMelody(true); });
   document.getElementById('stopMelodyBtn').addEventListener('click', stopMelody);
   document.getElementById('saveMelodyBtn').addEventListener('click', saveMelody);
-  document.getElementById('exportMelodyBtn').addEventListener('click', exportMelody);
   document.getElementById('exportTabBtn').addEventListener('click', exportTab);
+  document.getElementById('exportMidiBtn').addEventListener('click', exportMidi);
 }
 
 /* ===== integração de conta/pagamento (opcional) =====
@@ -1988,15 +2043,14 @@ function renderSaved(){
         '<div class="meta">'+p.chords.map(c=>c.name).join(' · ')+'</div>'+
         '<div class="acts">'+
           '<button class="btn" data-a="play">▶ Tocar</button>'+
-          '<button class="btn" data-a="txt">Melodia</button>'+
           '<button class="btn" data-a="tab">Tab</button>'+
-          '<button class="btn" data-a="json">JSON</button>'+
+          '<button class="btn" data-a="midi">MIDI</button>'+
           '<button class="btn" data-a="del">Excluir</button>'+
         '</div>';
       el.querySelector('[data-a="play"]').addEventListener('click',()=>loadMelodyFrom(p));
-      el.querySelector('[data-a="txt"]').addEventListener('click',()=>exportMelodySaved(p));
       el.querySelector('[data-a="tab"]').addEventListener('click',()=>exportTabSaved(p));
-      el.querySelector('[data-a="json"]').addEventListener('click',()=>download('melodia-'+p.tonic+'.json', JSON.stringify(p,null,2), 'application/json'));
+      el.querySelector('[data-a="midi"]').addEventListener('click',()=>exportMidiSaved(p));
+      el.querySelector('[data-a="del"]').addEventListener('click',()=>{ stopMelody(); const l=readSaved(); l.splice(idx,1); writeSaved(l); renderSaved(); toast('Removida.'); });
       el.querySelector('[data-a="del"]').addEventListener('click',()=>{ stopMelody(); const l=readSaved(); l.splice(idx,1); writeSaved(l); renderSaved(); toast('Removida.'); });
       wrap.appendChild(el);
       return;
