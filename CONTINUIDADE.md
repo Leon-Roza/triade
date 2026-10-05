@@ -18,6 +18,8 @@
 - **Detector de harmonia** por upload de áudio (FFT → chroma → Viterbi) com timeline,
   tonalidade detectada, **Salvar cifra** e **▶ Tocar** a cifra salva.
 - **Planos** (Grátis / Pro / Studio), conta, salvar progressões e exportar (cifra/PDF/JSON).
+- **Modo compositor**: gera uma melodia sobre o campo harmônico (densidade simples/média/rápida,
+  registro grave/médio/agudo, acompanhamento dos acordes), com `▶ Tocar`, **Salvar** e export `.txt`.
 
 ---
 
