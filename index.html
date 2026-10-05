@@ -207,6 +207,34 @@
   #timbreBtns{grid-template-columns:1fr;margin-bottom:0}
   .sound-group .tempo-row{margin-top:14px}
 
+  /* DETECTOR DE HARMONIA */
+  .detector{margin-top:6px;display:flex;flex-direction:column;gap:16px}
+  .det-top{display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:center}
+  .det-input label{display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+  .det-row{display:flex;gap:10px}
+  .det-row input[type=text]{flex:1;background:#0e0e1a;border:1px solid var(--stroke);border-radius:12px;padding:12px 14px;color:var(--txt);font-family:var(--font);font-size:14px;min-width:0}
+  .det-row input[type=text]:focus{outline:none;border-color:var(--tonica);box-shadow:0 0 0 3px rgba(34,211,238,.15)}
+  .det-or{color:var(--muted);font-size:12px;letter-spacing:2px;margin-top:22px}
+  input[type=file]{width:100%;color:var(--muted);font-size:13px}
+  input[type=file]::file-selector-button{font-family:var(--font);background:rgba(255,255,255,.06);color:var(--txt);border:1px solid var(--stroke);border-radius:10px;padding:9px 14px;margin-right:12px;cursor:pointer}
+  .yt-wrap{margin-top:2px;border-radius:16px;overflow:hidden;aspect-ratio:16/9;background:#000;border:1px solid var(--stroke)}
+  .yt-wrap iframe{width:100%;height:100%;border:0;display:block}
+  .det-progress{height:8px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden}
+  .det-progress .bar{height:100%;width:0;background:linear-gradient(90deg,var(--tonica),var(--sub));transition:width .15s}
+  .det-meta{display:flex;gap:18px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--muted);margin-bottom:14px}
+  .det-meta b{color:var(--txt)}
+  .tl{display:flex;gap:3px;height:56px;border-radius:12px;overflow:hidden;background:rgba(255,255,255,.04);padding:3px}
+  .tl .seg{position:relative;min-width:3px;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;color:#06121a;cursor:pointer;transition:transform .12s,filter .12s;overflow:hidden;white-space:nowrap;border-radius:5px}
+  .tl .seg:hover{filter:brightness(1.25)}
+  .tl .seg.cur{outline:2px solid #fff;outline-offset:-2px;z-index:2}
+  .chordlist{margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;max-height:170px;overflow:auto}
+  .chordlist .ci{font-size:12px;padding:7px 11px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid var(--stroke);color:var(--muted);cursor:pointer;transition:.15s}
+  .chordlist .ci b{color:var(--txt)}
+  .chordlist .ci:hover{background:rgba(255,255,255,.08)}
+  .chordlist .ci.cur{border-color:var(--accent,var(--tonica));color:var(--txt);background:rgba(255,255,255,.09)}
+  #detAudio{width:100%;margin-top:14px}
+  .det-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+
   footer{margin-top:60px;text-align:center;color:var(--muted);font-size:12px;line-height:1.7}
 
   @media (max-width:900px){
@@ -214,6 +242,8 @@
     .stage{grid-template-columns:1fr}
     .progression{grid-template-columns:1fr}
     .sound-row{grid-template-columns:1fr}
+    .det-top{grid-template-columns:1fr}
+    .det-or{margin:0;text-align:center}
     .hub .root{font-size:52px}
     .brand h1{font-size:24px}
   }
@@ -360,6 +390,39 @@
       <span><i class="m root"></i>Fundamental</span>
       <span><i class="m tone"></i>Demais notas do acorde</span>
       <span class="fb-hint">Afinação padrão E–A–D–G–B–E · 12 casas</span>
+    </div>
+  </section>
+
+  <div class="grid-title">
+    <h2>Detector de harmonia</h2>
+    <span id="detStatus">cole um link do YouTube ou envie um áudio</span>
+  </div>
+  <section class="detector panel">
+    <div class="det-top">
+      <div class="det-input">
+        <label>Link do YouTube</label>
+        <div class="det-row">
+          <input type="text" id="ytUrl" placeholder="https://www.youtube.com/watch?v=..." />
+          <button class="btn" id="ytBtn">Analisar</button>
+        </div>
+        <p class="hint" id="ytHint" style="margin-top:8px"></p>
+      </div>
+      <div class="det-or">OU</div>
+      <div class="det-input">
+        <label>Envie um áudio (mp3, wav, m4a, ogg)</label>
+        <input type="file" id="audioFile" accept="audio/*" />
+      </div>
+    </div>
+    <div id="ytPlayerWrap" class="yt-wrap" style="display:none"><div id="ytPlayer"></div></div>
+    <div class="det-progress" id="detProgress" style="display:none"><div class="bar" id="detBar"></div></div>
+    <div id="detResult" style="display:none">
+      <div class="det-meta" id="detMeta"></div>
+      <div class="tl" id="trackTimeline"></div>
+      <audio id="detAudio" controls style="display:none"></audio>
+      <div class="det-actions">
+        <button class="btn primary" id="useKeyBtn">✓ Usar esta tonalidade no site</button>
+      </div>
+      <div class="chordlist" id="chordList"></div>
     </div>
   </section>
 
@@ -1036,10 +1099,326 @@ function buildSoundControls(){
   updateTimbreLabel();
 }
 
+/* ============ DETECTOR DE HARMONIA ============ */
+// Preencha com a URL do backend (ex.: 'https://triade-api.onrender.com') para
+// habilitar a análise automática de links do YouTube. Vazio = só análise local.
+const DET_API = '';
+
+const ROOT_LABELS = ['C','Db','D','Eb','E','F','F#','G','Ab','A','Bb','B'];
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+
+const CHORD_TEMPLATES = [];
+(function(){
+  const defs = { maj:[[0,4,7],0], min:[[0,3,7],0], dim:[[0,3,6],0.05], aug:[[0,4,8],0.06] };
+  for(const q in defs){
+    const ivs = defs[q][0], pen = defs[q][1], nrm = Math.sqrt(ivs.length);
+    for(let r=0;r<12;r++){
+      const v = new Array(12).fill(0);
+      ivs.forEach(x=>v[(r+x)%12]=1);
+      CHORD_TEMPLATES.push({ root:r, quality:q, pen, vec:v.map(x=>x/nrm) });
+    }
+  }
+})();
+
+function makeFFT(n){
+  const levels = Math.log2(n)|0;
+  const cos = new Float32Array(n/2), sin = new Float32Array(n/2);
+  for(let i=0;i<n/2;i++){ cos[i]=Math.cos(2*Math.PI*i/n); sin[i]=Math.sin(2*Math.PI*i/n); }
+  const rev = new Uint32Array(n);
+  for(let i=0;i<n;i++){ let x=i,r=0; for(let j=0;j<levels;j++){ r=(r<<1)|(x&1); x>>=1; } rev[i]=r; }
+  return function(re, im){
+    for(let i=0;i<n;i++){ const j=rev[i]; if(j>i){ let t=re[i]; re[i]=re[j]; re[j]=t; t=im[i]; im[i]=im[j]; im[j]=t; } }
+    for(let size=2; size<=n; size<<=1){
+      const half=size>>1, step=n/size;
+      for(let i=0;i<n;i+=size){
+        for(let j=i,k=0;j<i+half;j++,k+=step){
+          const l=j+half;
+          const tre=re[l]*cos[k]+im[l]*sin[k];
+          const tim=im[l]*cos[k]-re[l]*sin[k];
+          re[l]=re[j]-tre; im[l]=im[j]-tim;
+          re[j]+=tre; im[j]+=tim;
+        }
+      }
+    }
+  };
+}
+
+function detectKey(avg){
+  const MAJ=[6.35,2.23,3.48,2.33,4.38,4.09,2.52,5.19,2.39,3.66,2.29,2.88];
+  const MIN=[6.33,2.68,3.52,5.38,2.60,3.53,2.54,4.75,3.98,2.69,3.34,3.17];
+  const corr=(a,b)=>{ const n=a.length; let ma=0,mb=0; for(let i=0;i<n;i++){ma+=a[i];mb+=b[i];} ma/=n;mb/=n; let num=0,da=0,db=0; for(let i=0;i<n;i++){ const x=a[i]-ma,y=b[i]-mb; num+=x*y; da+=x*x; db+=y*y; } return num/Math.sqrt(da*db+1e-9); };
+  let best={score:-2, root:0, mode:'maior'};
+  for(let r=0;r<12;r++){
+    const rotM=[], rotN=[];
+    for(let i=0;i<12;i++){ rotM[i]=MAJ[(i-r+12)%12]; rotN[i]=MIN[(i-r+12)%12]; }
+    const cm=corr(avg,rotM), cn=corr(avg,rotN);
+    if(cm>best.score) best={score:cm,root:r,mode:'maior'};
+    if(cn>best.score) best={score:cn,root:r,mode:'menorNatural'};
+  }
+  return best;
+}
+
+function keyFromChords(segments, avg){
+  const MAJ=[6.35,2.23,3.48,2.33,4.38,4.09,2.52,5.19,2.39,3.66,2.29,2.88];
+  const MIN=[6.33,2.68,3.52,5.38,2.60,3.53,2.54,4.75,3.98,2.69,3.34,3.17];
+  const corr=(a,b)=>{ const n=a.length; let ma=0,mb=0; for(let i=0;i<n;i++){ma+=a[i];mb+=b[i];} ma/=n;mb/=n; let num=0,da=0,db=0; for(let i=0;i<n;i++){ const x=a[i]-ma,y=b[i]-mb; num+=x*y; da+=x*x; db+=y*y; } return num/Math.sqrt(da*db+1e-9); };
+  const first=segments.find(s=>s.quality!=='N');
+  let best=null;
+  ['maior','menorNatural'].forEach(mode=>{
+    const prof = mode==='maior'?MAJ:MIN;
+    const dia = new Set(MODES[mode].intervals);
+    for(let r=0;r<12;r++){
+      const rot=[]; for(let i=0;i<12;i++) rot[i]=prof[(i-r+12)%12];
+      const cc=corr(avg,rot);
+      let fit=0,total=0;
+      for(const sg of segments){
+        if(sg.quality==='N') continue;
+        const dur=sg.end-sg.start; total+=dur;
+        const rel=((sg.root-r)%12+12)%12;
+        let w = dia.has(rel) ? (rel===0?2.2 : rel===7?1.6 : 1) : -0.8;
+        fit+=w*dur;
+      }
+      const nfit = total>0 ? fit/total : 0;
+      const bonus = (first && ((first.root-r)%12+12)%12===0 && first.quality===(mode==='maior'?'maj':'min')) ? 0.2 : 0;
+      const score = cc*0.6 + nfit*0.9 + bonus;
+      if(!best || score>best.score) best={score,root:r,mode};
+    }
+  });
+  return best;
+}
+
+async function analyzeAudioBuffer(audioBuffer, onProgress){
+  const targetSR = 11025;
+  const nch = audioBuffer.numberOfChannels, srcSR = audioBuffer.sampleRate, ratio = srcSR/targetSR;
+  const chans=[]; for(let c=0;c<nch;c++) chans.push(audioBuffer.getChannelData(c));
+  const outLen = Math.floor(audioBuffer.length/ratio);
+  const mono = new Float32Array(outLen);
+  for(let i=0;i<outLen;i++){
+    const s0=Math.floor(i*ratio), s1=Math.min(audioBuffer.length, Math.floor((i+1)*ratio));
+    let acc=0,cnt=0;
+    for(let k=s0;k<s1;k++){ let v=0; for(let c=0;c<nch;c++) v+=chans[c][k]; acc+=v/nch; cnt++; }
+    mono[i]= cnt? acc/cnt : 0;
+  }
+  const N=4096, HOP=2048, half=N>>1;
+  const fft=makeFFT(N);
+  const re=new Float32Array(N), im=new Float32Array(N), win=new Float32Array(N);
+  for(let i=0;i<N;i++) win[i]=0.5-0.5*Math.cos(2*Math.PI*i/(N-1));
+  const binPC=new Int8Array(half);
+  for(let k=1;k<half;k++){
+    const f=k*targetSR/N;
+    if(f>=55 && f<=2200){ const midi=69+12*Math.log2(f/440); let pc=Math.round(midi)%12; if(pc<0)pc+=12; binPC[k]=pc; }
+    else binPC[k]=-1;
+  }
+  const nFrames=Math.max(1, Math.floor((mono.length-N)/HOP)+1);
+  const NT=CHORD_TEMPLATES.length;
+  const simsAll=new Float32Array(nFrames*NT);
+  const chromaFrames=new Float32Array(nFrames*12);
+  const energies=new Float32Array(nFrames);
+  for(let fr=0; fr<nFrames; fr++){
+    const off=fr*HOP;
+    for(let i=0;i<N;i++){ const v=mono[off+i]||0; re[i]=v*win[i]; im[i]=0; }
+    fft(re,im);
+    const chroma=new Float32Array(12); let s=0;
+    for(let k=1;k<half;k++){ const pc=binPC[k]; if(pc<0) continue; const m=re[k]*re[k]+im[k]*im[k]; chroma[pc]+=m; s+=m; }
+    let nr=0; for(let i=0;i<12;i++) nr+=chroma[i]*chroma[i];
+    nr=Math.sqrt(nr);
+    if(nr>1e-12) for(let i=0;i<12;i++){ chroma[i]/=nr; chromaFrames[fr*12+i]=chroma[i]; }
+    energies[fr]=s;
+    for(let t=0;t<NT;t++){ const tv=CHORD_TEMPLATES[t].vec; let d=0; for(let i=0;i<12;i++) d+=chroma[i]*tv[i]; simsAll[fr*NT+t]=d-CHORD_TEMPLATES[t].pen; }
+    if(fr%24===0){ if(onProgress) onProgress(fr/nFrames); await sleep(0); }
+  }
+  if(onProgress) onProgress(1);
+
+  // silencia quadros de baixa energia (evita "acorde" em pausas/ruído)
+  let maxE=0; for(let fr=0;fr<nFrames;fr++) if(energies[fr]>maxE) maxE=energies[fr];
+  const gate=maxE*0.02;
+  for(let fr=0;fr<nFrames;fr++){
+    if(energies[fr]<gate){
+      for(let i=0;i<12;i++) chromaFrames[fr*12+i]=0;
+      for(let t=0;t<NT;t++) simsAll[fr*NT+t]=-1;
+    }
+  }
+
+  const S=NT+1, T=nFrames;
+  const frameMax=new Float32Array(T);
+  for(let t=0;t<T;t++){ let mx=0; for(let j=0;j<NT;j++){ const v=simsAll[t*NT+j]; if(v>mx)mx=v; } frameMax[t]=mx; }
+  const emit=(t,s)=> s<NT ? simsAll[t*NT+s] : 0.45+0.55*(1-frameMax[t]);
+  const delta=new Float32Array(S), psi=new Int16Array(T*S);
+  for(let s=0;s<S;s++) delta[s]=emit(0,s);
+  for(let t=1;t<T;t++){
+    const prev=delta.slice();
+    for(let s=0;s<S;s++){
+      let best=-1e9,arg=0;
+      for(let p=0;p<S;p++){ const v=prev[p]+(p===s?0.40:-0.25); if(v>best){best=v;arg=p;} }
+      delta[s]=best+emit(t,s); psi[t*S+s]=arg;
+    }
+  }
+  let last=0; for(let s=1;s<S;s++) if(delta[s]>delta[last]) last=s;
+  const path=new Int16Array(T); path[T-1]=last;
+  for(let t=T-1;t>0;t--) path[t-1]=psi[t*S+path[t]];
+
+  const frameDur=HOP/targetSR, raw=[];
+  let cur=path[0], start=0;
+  const push=(a,b,st)=>{ const sg={start:a*frameDur,end:b*frameDur}; if(st<NT){ sg.root=CHORD_TEMPLATES[st].root; sg.quality=CHORD_TEMPLATES[st].quality; } else sg.quality='N'; raw.push(sg); };
+  for(let t=1;t<T;t++){ if(path[t]!==cur){ push(start,t,cur); start=t; cur=path[t]; } }
+  push(start,T,cur);
+  const segments=[];
+  for(const sg of raw){
+    if(segments.length && (sg.end-sg.start)<0.35) segments[segments.length-1].end=sg.end;
+    else segments.push(sg);
+  }
+  const avg=new Float32Array(12);
+  for(let fr=0;fr<T;fr++) for(let i=0;i<12;i++) avg[i]+=chromaFrames[fr*12+i];
+  for(let i=0;i<12;i++) avg[i]/=T;
+  const key=keyFromChords(segments, avg);
+  return { segments, key, duration:audioBuffer.duration, chordCount:segments.filter(s=>s.quality!=='N').length };
+}
+
+/* ----- YouTube IFrame API ----- */
+let ytPlayer=null, ytApiCallbacks=[], ytApiLoading=false, detSource=null, detYtId=null, lastDetection=null, detFollow=null, detCtx=null;
+
+function loadYTAPI(cb){
+  if(window.YT && window.YT.Player){ cb(); return; }
+  ytApiCallbacks.push(cb);
+  if(!ytApiLoading){
+    ytApiLoading=true;
+    const s=document.createElement('script'); s.src='https://www.youtube.com/iframe_api';
+    document.head.appendChild(s);
+  }
+  window.onYouTubeIframeAPIReady=()=>{ ytApiCallbacks.forEach(f=>f()); ytApiCallbacks=[]; };
+}
+function ytIdFromUrl(url){
+  const m = String(url).match(/(?:v=|\/v\/|youtu\.be\/|\/embed\/|\/shorts\/)([A-Za-z0-9_-]{11})/);
+  return m ? m[1] : null;
+}
+function showYT(id){
+  const wrap=document.getElementById('ytPlayerWrap'); wrap.style.display='block';
+  const host=document.getElementById('ytPlayer'); host.innerHTML='';
+  const div=document.createElement('div'); div.id='ytPlayerEl'; host.appendChild(div);
+  loadYTAPI(()=>{ ytPlayer=new window.YT.Player('ytPlayerEl',{ videoId:id, playerVars:{ rel:0 } }); });
+}
+function ytTime(){ try{ return ytPlayer && ytPlayer.getCurrentTime ? ytPlayer.getCurrentTime() : 0; }catch(e){ return 0; } }
+
+/* ----- helpers de exibição ----- */
+function fmtTime(s){ s=Math.max(0,Math.floor(s)); return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); }
+function segName(sg){ if(sg.quality==='N') return '·'; const suf = sg.quality==='maj'?'':sg.quality==='min'?'m':sg.quality==='dim'?'º':'5+'; return ROOT_LABELS[sg.root]+suf; }
+function keyContext(rootPc, modeKey){
+  const mode=MODES[modeKey], map={};
+  mode.intervals.forEach((iv,i)=>{ map[((rootPc+iv)%12)+'|'+mode.qualities[i]]={func:mode.funcs[i],roman:mode.romans[i]}; });
+  return map;
+}
+function setDetStatus(t){ document.getElementById('detStatus').textContent=t; }
+function showProgress(p){ document.getElementById('detProgress').style.display='block'; document.getElementById('detBar').style.width=(p*100).toFixed(1)+'%'; }
+function hideProgress(){ document.getElementById('detProgress').style.display='none'; }
+
+function seekDet(t){
+  if(detSource==='file'){ const a=document.getElementById('detAudio'); a.currentTime=t; a.play().catch(()=>{}); }
+  else if(detSource==='youtube' && ytPlayer && ytPlayer.seekTo){ ytPlayer.seekTo(t,true); }
+}
+function startFollow(){
+  if(detFollow) clearInterval(detFollow);
+  detFollow=setInterval(()=>{
+    if(!lastDetection) return;
+    const t = detSource==='youtube' ? ytTime() : (document.getElementById('detAudio').currentTime||0);
+    let idx=-1;
+    for(let i=0;i<lastDetection.segments.length;i++){ const s=lastDetection.segments[i]; if(t>=s.start && t<s.end){ idx=i; break; } }
+    document.querySelectorAll('.tl .seg').forEach((el,i)=>el.classList.toggle('cur', i===idx));
+    document.querySelectorAll('.chordlist .ci').forEach((el,i)=>el.classList.toggle('cur', i===idx));
+  }, 180);
+}
+function renderDetection(res, opts){
+  lastDetection=res; detSource=opts.source; detYtId=opts.ytId||null;
+  const kmode = res.key.mode==='maior' ? 'Maior' : 'Menor';
+  document.getElementById('detMeta').innerHTML =
+    `<span>Tonalidade: <b>${ROOT_LABELS[res.key.root]} ${kmode}</b></span>`+
+    `<span>Duração: <b>${fmtTime(res.duration)}</b></span>`+
+    `<span>Acordes detectados: <b>${res.chordCount}</b></span>`+
+    `<span>Fonte: <b>${opts.source==='youtube'?'YouTube':'arquivo'}</b></span>`;
+  const kc=keyContext(res.key.root, res.key.mode);
+  const tl=document.getElementById('trackTimeline'); tl.innerHTML='';
+  const cl=document.getElementById('chordList'); cl.innerHTML='';
+  res.segments.forEach((sg,i)=>{
+    const name=segName(sg), dur=Math.max(0.05, sg.end-sg.start);
+    const known = sg.quality!=='N' && kc[sg.root+'|'+sg.quality];
+    const col = sg.quality==='N' ? '#33333f' : (known ? FUNC_COLOR[known.func] : '#8a8aa3');
+    const el=document.createElement('div');
+    el.className='seg'; el.style.flexGrow=String(dur); el.style.background=col; el.style.flexBasis='0';
+    el.textContent = dur>0.9 ? name : ''; el.title=name+' · '+fmtTime(sg.start);
+    el.addEventListener('click',()=>seekDet(sg.start));
+    tl.appendChild(el);
+    const ci=document.createElement('span'); ci.className='ci'; ci.style.setProperty('--accent',col);
+    ci.innerHTML='<b>'+name+'</b> '+fmtTime(sg.start);
+    ci.addEventListener('click',()=>seekDet(sg.start));
+    cl.appendChild(ci);
+  });
+  document.getElementById('detResult').style.display='block';
+  startFollow();
+}
+
+function showYTHint(){
+  document.getElementById('ytHint').innerHTML = DET_API
+    ? 'Analisando pelo servidor…'
+    : 'A análise automática do YouTube precisa do <b>servidor de análise</b> (código incluído em <code>/server</code>, ainda não hospedado). Você pode ouvir o vídeo acima e <b>enviar o arquivo de áudio</b> para detectar a harmonia agora.';
+}
+
+async function analyzeYoutube(url){
+  const id=ytIdFromUrl(url);
+  if(!id){ setDetStatus('Link do YouTube inválido'); return; }
+  showYT(id);
+  if(!DET_API){ showYTHint(); setDetStatus('Player carregado — envie o áudio para analisar'); return; }
+  setDetStatus('Analisando link no servidor…'); showProgress(0.15);
+  try{
+    const r=await fetch(DET_API.replace(/\/$/,'')+'/analyze',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({url}) });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const data=await r.json();
+    showProgress(1); hideProgress();
+    if(data.error) throw new Error(data.error);
+    renderDetection(data, { source:'youtube', ytId:id });
+    setDetStatus('Harmonia detectada (YouTube)');
+  }catch(e){ hideProgress(); setDetStatus('Falha na análise: '+e.message); showYTHint(); }
+}
+
+async function analyzeFile(file){
+  setDetStatus('Decodificando áudio…'); showProgress(0);
+  try{
+    const buf=await file.arrayBuffer();
+    detCtx = detCtx || new (window.AudioContext||window.webkitAudioContext)();
+    const decoded=await detCtx.decodeAudioData(buf);
+    const url=URL.createObjectURL(file);
+    const audioEl=document.getElementById('detAudio');
+    audioEl.src=url; audioEl.style.display='block';
+    setDetStatus('Analisando harmonia…');
+    const res=await analyzeAudioBuffer(decoded, p=>{ showProgress(p); setDetStatus('Analisando… '+Math.round(p*100)+'%'); });
+    hideProgress();
+    renderDetection(res, { source:'file', url });
+    setDetStatus('Harmonia detectada');
+  }catch(e){ hideProgress(); setDetStatus('Erro ao analisar: '+e.message); }
+}
+
+function useDetectedKey(){
+  if(!lastDetection) return;
+  const label=ROOT_LABELS[lastDetection.key.root];
+  const t=TONICS.find(x=>x.label===label); if(t) state.tonic=t;
+  state.mode=lastDetection.key.mode; state.selected=0;
+  document.querySelectorAll('.note-btn').forEach(x=>x.classList.toggle('active', x.textContent===label));
+  const keys=Object.keys(MODES);
+  document.querySelectorAll('.mode-btn').forEach((x,idx)=>x.classList.toggle('active', keys[idx]===state.mode));
+  build();
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
+
+function setupDetector(){
+  document.getElementById('ytBtn').addEventListener('click', ()=>analyzeYoutube(document.getElementById('ytUrl').value.trim()));
+  document.getElementById('ytUrl').addEventListener('keydown', e=>{ if(e.key==='Enter') analyzeYoutube(e.target.value.trim()); });
+  document.getElementById('audioFile').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) analyzeFile(f); });
+  document.getElementById('useKeyBtn').addEventListener('click', useDetectedKey);
+}
+
 /* ============ START ============ */
 buildControls();
 buildProgressionControls();
 buildSoundControls();
+setupDetector();
 build();
 </script>
 </body>
