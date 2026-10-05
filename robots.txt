@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://usetriade.com.br/sitemap.xml

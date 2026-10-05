@@ -504,7 +504,7 @@
         <li>Timbres e efeitos extras (distorções, ambiência)</li>
         <li>Sem anúncios + suporte por e-mail</li>
       </ul>
-      <a class="btn primary cta" id="proCta" href="mailto:contato@triade.app?subject=Quero%20o%20plano%20Pro">Assinar Pro</a>
+      <a class="btn primary cta" id="proCta" href="mailto:contato@usetriade.com.br?subject=Quero%20o%20plano%20Pro">Assinar Pro</a>
     </div>
 
     <div class="plan">
@@ -520,10 +520,10 @@
         <li>Marca própria (white-label) opcional</li>
         <li>Suporte prioritário</li>
       </ul>
-      <a class="btn cta" id="studioCta" href="mailto:contato@triade.app?subject=Plano%20Professor%2FStudio">Falar com vendas</a>
+      <a class="btn cta" id="studioCta" href="mailto:contato@usetriade.com.br?subject=Plano%20Professor%2FStudio">Falar com vendas</a>
     </div>
   </section>
-  <p class="plans-foot">Pagamento seguro via cartão, Pix ou boleto · 7 dias de garantia · sem fidelidade<br />Dúvidas? Fale com a gente em <b>contato@triade.app</b></p>
+  <p class="plans-foot">Pagamento seguro via cartão, Pix ou boleto · 7 dias de garantia · sem fidelidade<br />Dúvidas? Fale com a gente em <b>contato@usetriade.com.br</b></p>
 
   <footer>
     TRÍADE · campo harmônico interativo para guitarristas e violonistas.<br />
@@ -1460,7 +1460,10 @@ function setupDetector(){
   document.getElementById('useKeyBtn').addEventListener('click', useDetectedKey);
 }
 
-/* ===== checkout (plugável): cole as URLs dos produtos ===== */
+/* ===== checkout (Mercado Pago) =====
+   Crie um "Link de pagamento" (ou Assinatura) no Mercado Pago para cada plano e
+   cole as URLs abaixo. Ex.: 'https://mpago.la/xxxxxxx'.
+   Enquanto estiver vazio, o botão abre um e-mail de contato. */
 const CHECKOUT = { pro_mensal:'', pro_anual:'', studio:'' };
 let currentCycle = 'mensal';
 
@@ -1468,7 +1471,7 @@ function goCheckout(plan){
   const key = plan==='pro' ? ('pro_'+currentCycle) : plan;
   const url = CHECKOUT[key];
   if(url){ window.open(url,'_blank'); return; }
-  window.location.href = 'mailto:contato@triade.app?subject='+encodeURIComponent('Plano '+plan+' ('+currentCycle+')');
+  window.location.href = 'mailto:contato@usetriade.com.br?subject='+encodeURIComponent('Plano '+plan+' ('+currentCycle+')');
 }
 
 function setupPlans(){

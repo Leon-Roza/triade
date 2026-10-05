@@ -5,6 +5,19 @@
 
 ---
 
+## 0. Decisões tomadas
+- **Domínio:** `usetriade.com.br` (registro no Registro.br).
+- **Pagamento:** **Mercado Pago** (Link de Pagamento / Assinatura).
+- **Conta de usuário:** **local/demo** por enquanto (localStorage); migrar para
+  Supabase quando precisar de login real e progressões na nuvem.
+- **Já implementado no site:** seção de planos com toggle mensal/anual, checkout
+  plugável (`CHECKOUT` no `index.html`), conta local, salvar/carregar progressões
+  e exportação (cifra .txt, PDF via impressão e JSON).
+- **Pendências suas:** registrar/apontar o DNS, criar os links no Mercado Pago e
+  preencher as URLs no `CHECKOUT`.
+
+---
+
 ## 1. Posicionamento
 
 **O que é:** ferramenta de harmonia para guitarristas e violonistas — disco/campo
