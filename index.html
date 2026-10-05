@@ -254,6 +254,27 @@
   .plan .cta{margin-top:auto;display:flex;justify-content:center;text-align:center}
   .plans-foot{text-align:center;color:var(--muted);font-size:12px;margin-top:22px;line-height:1.7}
 
+  /* CONTA / SALVAS / MODAL */
+  .header-acc{font-size:13px;padding:11px 18px;white-space:nowrap}
+  .saved-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+  .saved-item{background:var(--panel);border:1px solid var(--stroke);border-radius:16px;padding:16px}
+  .saved-item h4{font-family:var(--display);font-size:16px;letter-spacing:.5px}
+  .saved-item .meta{color:var(--muted);font-size:12px;margin:7px 0 12px}
+  .saved-item .acts{display:flex;gap:7px;flex-wrap:wrap}
+  .saved-item .acts .btn{padding:8px 11px;font-size:12px}
+  .saved-sec .hint{color:var(--muted);font-size:13px;line-height:1.6}
+  .modal-bg{position:fixed;inset:0;background:rgba(3,3,8,.74);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;z-index:60;padding:20px}
+  .modal-bg.open{display:flex}
+  .modal{background:#0d0d18;border:1px solid var(--stroke);border-radius:22px;padding:28px;max-width:420px;width:100%;box-shadow:0 30px 80px rgba(0,0,0,.65)}
+  .modal h3{font-family:var(--display);font-size:20px;margin-bottom:8px}
+  .modal p{color:var(--muted);font-size:13px;line-height:1.5;margin-bottom:16px}
+  .modal input{width:100%;background:#11111e;border:1px solid var(--stroke);border-radius:12px;padding:12px 14px;color:var(--txt);font-family:var(--font);font-size:14px;margin-bottom:10px}
+  .modal input:focus{outline:none;border-color:var(--tonica)}
+  .modal .row{display:flex;gap:10px;margin-top:8px}
+  .modal .row .btn{flex:1;display:flex;justify-content:center}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,20px);background:#12121f;border:1px solid var(--stroke);color:var(--txt);padding:13px 20px;border-radius:14px;font-size:13.5px;box-shadow:0 18px 50px rgba(0,0,0,.6);opacity:0;pointer-events:none;transition:.25s;z-index:70}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+
   footer{margin-top:60px;text-align:center;color:var(--muted);font-size:12px;line-height:1.7}
 
   @media (max-width:900px){
@@ -285,6 +306,7 @@
     </div>
     <div class="tempo"><span class="dot"></span> escolha o tom e toque</div>
     <a class="btn header-cta" href="#planos">Ver planos</a>
+    <button class="btn header-acc" id="accountBtn">Entrar</button>
   </header>
 
   <section class="controls">
@@ -354,6 +376,7 @@
         <button class="btn" id="newProgBtn">🎲 Nova progressão</button>
         <button class="btn primary" id="playProgBtn">▶ Tocar</button>
         <button class="btn" id="stopProgBtn" disabled>■ Parar</button>
+        <button class="btn" id="saveProgBtn">💾 Salvar</button>
       </div>
     </div>
     <div class="panel">
@@ -374,6 +397,15 @@
         <label class="check"><input type="checkbox" id="metroChk" /> metrônomo</label>
       </div>
     </div>
+  </section>
+
+  <div class="grid-title" id="minhas">
+    <h2>Minhas progressões</h2>
+    <span id="savedCount">—</span>
+  </div>
+  <section class="saved-sec panel">
+    <p class="hint" id="savedEmpty">Entre na sua conta e toque em “Salvar” para guardar suas progressões aqui.</p>
+    <div class="saved-list" id="savedList"></div>
   </section>
 
   <div class="grid-title">
@@ -472,7 +504,7 @@
         <li>Timbres e efeitos extras (distorções, ambiência)</li>
         <li>Sem anúncios + suporte por e-mail</li>
       </ul>
-      <a class="btn primary cta" href="mailto:contato@triade.app?subject=Quero%20o%20plano%20Pro">Assinar Pro</a>
+      <a class="btn primary cta" id="proCta" href="mailto:contato@triade.app?subject=Quero%20o%20plano%20Pro">Assinar Pro</a>
     </div>
 
     <div class="plan">
@@ -488,7 +520,7 @@
         <li>Marca própria (white-label) opcional</li>
         <li>Suporte prioritário</li>
       </ul>
-      <a class="btn cta" href="mailto:contato@triade.app?subject=Plano%20Professor%2FStudio">Falar com vendas</a>
+      <a class="btn cta" id="studioCta" href="mailto:contato@triade.app?subject=Plano%20Professor%2FStudio">Falar com vendas</a>
     </div>
   </section>
   <p class="plans-foot">Pagamento seguro via cartão, Pix ou boleto · 7 dias de garantia · sem fidelidade<br />Dúvidas? Fale com a gente em <b>contato@triade.app</b></p>
@@ -498,6 +530,20 @@
     Dica: use um capotraste para transformar shapes fáceis em qualquer tonalidade.
   </footer>
 </div>
+
+<div class="modal-bg" id="authModal">
+  <div class="modal">
+    <h3 id="authTitle">Entrar na TRÍADE</h3>
+    <p>Guarde suas progressões e desbloqueie os recursos Pro. Conta local de demonstração (sem servidor) — serve para você testar o fluxo de assinatura.</p>
+    <input type="text" id="authName" placeholder="Seu nome" autocomplete="name" />
+    <input type="email" id="authEmail" placeholder="seu@email.com" autocomplete="email" />
+    <div class="row">
+      <button class="btn primary" id="authOk">Entrar / criar conta</button>
+      <button class="btn" id="authCancel">Cancelar</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
 
 <script>
 /* ============ TEORIA ============ */
@@ -1414,16 +1460,169 @@ function setupDetector(){
   document.getElementById('useKeyBtn').addEventListener('click', useDetectedKey);
 }
 
+/* ===== checkout (plugável): cole as URLs dos produtos ===== */
+const CHECKOUT = { pro_mensal:'', pro_anual:'', studio:'' };
+let currentCycle = 'mensal';
+
+function goCheckout(plan){
+  const key = plan==='pro' ? ('pro_'+currentCycle) : plan;
+  const url = CHECKOUT[key];
+  if(url){ window.open(url,'_blank'); return; }
+  window.location.href = 'mailto:contato@triade.app?subject='+encodeURIComponent('Plano '+plan+' ('+currentCycle+')');
+}
+
 function setupPlans(){
   const opts=document.querySelectorAll('.bill-opt');
   opts.forEach(b=>b.addEventListener('click', ()=>{
     opts.forEach(x=>x.classList.remove('active'));
     b.classList.add('active');
-    const annual = b.dataset.bill==='anual';
+    currentCycle = b.dataset.bill==='anual' ? 'anual' : 'mensal';
+    const annual = currentCycle==='anual';
     document.querySelectorAll('.plan .amount').forEach(a=>{ a.textContent = annual ? a.dataset.anual : a.dataset.mensal; });
     document.querySelectorAll('.plan .period').forEach(p=>{ p.textContent = annual ? '/ano' : '/mês'; });
     document.querySelectorAll('.plan .save').forEach(s=>{ s.style.display = (annual && s.textContent.trim()) ? 'inline-block' : 'none'; });
   }));
+  document.getElementById('proCta').addEventListener('click', e=>{ e.preventDefault(); goCheckout('pro'); });
+  document.getElementById('studioCta').addEventListener('click', e=>{ e.preventDefault(); goCheckout('studio'); });
+}
+
+/* ============ CONTA / PROGRESSÕES SALVAS ============ */
+function readUser(){ try{ return JSON.parse(localStorage.getItem('triade_user')||'null'); }catch(e){ return null; } }
+function savedKey(){ return 'triade_saved_' + (state.user ? state.user.email : 'anon'); }
+function readSaved(){ try{ return JSON.parse(localStorage.getItem(savedKey())||'[]'); }catch(e){ return []; } }
+function writeSaved(list){ localStorage.setItem(savedKey(), JSON.stringify(list.slice(0,200))); }
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'),1900);
+}
+function renderAccount(){
+  const b=document.getElementById('accountBtn');
+  b.textContent = state.user ? (state.user.name||state.user.email) : 'Entrar';
+  b.title = state.user ? 'Clique para sair' : 'Entrar / criar conta';
+}
+function openAuth(){ document.getElementById('authModal').classList.add('open'); setTimeout(()=>document.getElementById('authEmail').focus(),50); }
+function closeAuth(){ document.getElementById('authModal').classList.remove('open'); }
+function doAuth(){
+  const email=document.getElementById('authEmail').value.trim();
+  const name=document.getElementById('authName').value.trim();
+  const ok=/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
+  document.getElementById('authEmail').style.borderColor = ok ? '' : '#f87171';
+  if(!ok) return;
+  state.user={ email, name: name || email.split('@')[0] };
+  localStorage.setItem('triade_user', JSON.stringify(state.user));
+  closeAuth(); renderAccount(); renderSaved(); toast('Bem-vindo(a), '+state.user.name+'!');
+}
+function logout(){ state.user=null; localStorage.removeItem('triade_user'); renderAccount(); renderSaved(); toast('Você saiu da conta.'); }
+
+function capturePreset(){
+  return {
+    name: state.progression.tpl,
+    tonic: state.tonic.label, mode: state.mode,
+    degrees: state.progression.degrees.slice(),
+    chords: current.progressionChords.map(c=>({ name:c.pretty, degree:c.degree, notes:c.notes })),
+    rhythm: state.rhythm, bpm: player.bpm, timbre: state.timbre, distortion: state.distortion,
+    when: Date.now()
+  };
+}
+function savePreset(){
+  if(!state.user){ openAuth(); return; }
+  const list=readSaved(); list.unshift(capturePreset()); writeSaved(list);
+  renderSaved(); toast('Progressão salva!');
+}
+function loadPreset(p){
+  const t=TONICS.find(x=>x.label===p.tonic); if(t) state.tonic=t;
+  state.mode=p.mode;
+  state.progression={ tpl:p.name, degrees:p.degrees.slice() };
+  state.rhythm=p.rhythm; state.timbre=p.timbre; state.distortion=!!p.distortion;
+  player.bpm=p.bpm||90; state.selected=0;
+  document.querySelectorAll('.note-btn').forEach(x=>x.classList.toggle('active', x.textContent===p.tonic));
+  const keys=Object.keys(MODES);
+  document.querySelectorAll('.mode-btn').forEach((x,i)=>x.classList.toggle('active', keys[i]===p.mode));
+  document.querySelectorAll('#rhythmBtns .rhythm-btn').forEach(x=>x.classList.toggle('active', x.textContent===RHYTHMS[p.rhythm].name));
+  document.querySelectorAll('#timbreBtns .rhythm-btn').forEach(x=>x.classList.toggle('active', x.textContent===TIMBRES[p.timbre].name));
+  const dc=document.getElementById('distChk'); if(dc) dc.checked=!!p.distortion;
+  const tm=document.getElementById('tempo'); if(tm){ tm.value=player.bpm; document.getElementById('tempoVal').textContent=player.bpm+' BPM'; }
+  build(); toast('Progressão carregada.'); window.scrollTo({top:0,behavior:'smooth'});
+}
+function renderSaved(){
+  const wrap=document.getElementById('savedList');
+  const empty=document.getElementById('savedEmpty');
+  const list=readSaved();
+  document.getElementById('savedCount').textContent = list.length ? (list.length+(list.length>1?' salvas':' salva')) : '—';
+  wrap.innerHTML='';
+  if(!list.length){
+    empty.style.display='block';
+    empty.textContent = state.user ? 'Nenhuma progressão salva ainda. Toque em “Salvar” acima.' : 'Entre na sua conta e toque em “Salvar” para guardar suas progressões aqui.';
+    return;
+  }
+  empty.style.display='none';
+  list.forEach((p,idx)=>{
+    const el=document.createElement('div'); el.className='saved-item';
+    const mode=p.mode==='maior'?'Maior':'Menor';
+    el.innerHTML =
+      '<h4>'+p.chords.map(c=>c.name).join(' · ')+'</h4>'+
+      '<div class="meta">'+p.tonic+' '+mode+' · '+(RHYTHMS[p.rhythm]?RHYTHMS[p.rhythm].name:'')+' · '+p.bpm+' BPM</div>'+
+      '<div class="acts">'+
+        '<button class="btn" data-a="load">Carregar</button>'+
+        '<button class="btn" data-a="txt">Cifra</button>'+
+        '<button class="btn" data-a="print">PDF</button>'+
+        '<button class="btn" data-a="json">JSON</button>'+
+        '<button class="btn" data-a="del">Excluir</button>'+
+      '</div>';
+    el.querySelector('[data-a="load"]').addEventListener('click',()=>loadPreset(p));
+    el.querySelector('[data-a="txt"]').addEventListener('click',()=>exportCifra(p));
+    el.querySelector('[data-a="print"]').addEventListener('click',()=>printPreset(p));
+    el.querySelector('[data-a="json"]').addEventListener('click',()=>download((p.tonic+'-'+p.name).replace(/[^\w-]+/g,'_')+'.json', JSON.stringify(p,null,2), 'application/json'));
+    el.querySelector('[data-a="del"]').addEventListener('click',()=>{ const l=readSaved(); l.splice(idx,1); writeSaved(l); renderSaved(); toast('Removida.'); });
+    wrap.appendChild(el);
+  });
+}
+function download(name, text, type){
+  const blob=new Blob([text],{type:type||'text/plain;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+}
+function cifraText(p){
+  const mode=p.mode==='maior'?'Maior':'Menor';
+  let s='TRÍADE — Cifra\n';
+  s+='Tonalidade: '+p.tonic+' '+mode+'\n';
+  s+='Progressão: '+p.chords.map(c=>c.name).join('  ')+'\n';
+  s+='Ritmo: '+(RHYTHMS[p.rhythm]?RHYTHMS[p.rhythm].name:'')+' · '+p.bpm+' BPM\n';
+  s+='Data: '+new Date().toLocaleDateString('pt-BR')+'\n\nAcordes:\n';
+  p.chords.forEach(c=>{ s+='  '+c.name.padEnd(6,' ')+' ('+c.degree+')   '+c.notes.join(' ')+'\n'; });
+  s+='\nTRÍADE · campo harmônico interativo\n';
+  return s;
+}
+function exportCifra(p){ download((p.tonic+'-'+p.name).replace(/[^\w-]+/g,'_')+'.txt', cifraText(p)); }
+function printPreset(p){
+  const mode=p.mode==='maior'?'Maior':'Menor';
+  const w=window.open('','_blank');
+  if(!w){ toast('Permita pop-ups para gerar o PDF.'); return; }
+  w.document.write('<html><head><title>TRÍADE — '+p.tonic+' '+mode+'</title>'+
+    '<style>body{font-family:Georgia,serif;padding:44px;color:#111}h1{font-size:22px;margin:0 0 6px}p{color:#444}'+
+    '.ch{font-size:34px;font-weight:bold;margin:18px 0;letter-spacing:1px}'+
+    'table{border-collapse:collapse;margin-top:18px;width:100%}td,th{border:1px solid #ccc;padding:8px 14px;text-align:left;font-size:14px}</style>'+
+    '</head><body>'+
+    '<h1>TRÍADE — Cifra</h1>'+
+    '<p><b>Tonalidade:</b> '+p.tonic+' '+mode+' &nbsp;·&nbsp; <b>Ritmo:</b> '+(RHYTHMS[p.rhythm]?RHYTHMS[p.rhythm].name:'')+' · '+p.bpm+' BPM</p>'+
+    '<div class="ch">'+p.chords.map(c=>c.name).join('&nbsp;&nbsp;&nbsp;')+'</div>'+
+    '<table><tr><th>Grau</th><th>Acorde</th><th>Notas</th></tr>'+
+    p.chords.map(c=>'<tr><td>'+c.degree+'</td><td>'+c.name+'</td><td>'+c.notes.join(' ')+'</td></tr>').join('')+
+    '</table><p style="margin-top:24px;font-size:12px;color:#888">Gerado por TRÍADE · '+new Date().toLocaleDateString('pt-BR')+'</p>'+
+    '</body></html>');
+  w.document.close(); w.focus(); setTimeout(()=>w.print(),350);
+}
+function setupAccount(){
+  state.user = readUser();
+  document.getElementById('accountBtn').addEventListener('click', ()=>{ state.user ? logout() : openAuth(); });
+  document.getElementById('authOk').addEventListener('click', doAuth);
+  document.getElementById('authCancel').addEventListener('click', closeAuth);
+  document.getElementById('authModal').addEventListener('click', e=>{ if(e.target.id==='authModal') closeAuth(); });
+  document.getElementById('authEmail').addEventListener('keydown', e=>{ if(e.key==='Enter') doAuth(); });
+  document.getElementById('authName').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('authEmail').focus(); });
+  document.getElementById('saveProgBtn').addEventListener('click', savePreset);
 }
 
 /* ============ START ============ */
@@ -1432,7 +1631,10 @@ buildProgressionControls();
 buildSoundControls();
 setupDetector();
 setupPlans();
+setupAccount();
 build();
+renderAccount();
+renderSaved();
 </script>
 </body>
 </html>
