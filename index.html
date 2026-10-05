@@ -225,6 +225,9 @@
   .chordlist .ci b{color:var(--txt)}
   .chordlist .ci:hover{background:rgba(255,255,255,.08)}
   .chordlist .ci.cur{border-color:var(--accent,var(--tonica));color:var(--txt);background:rgba(255,255,255,.09)}
+  .cifra-chords{margin:4px 0 12px;display:flex;flex-wrap:wrap;gap:5px;max-height:96px;overflow:auto}
+  .cifra-play{font-size:12px;font-weight:700;padding:4px 8px;border-radius:7px;background:rgba(255,255,255,.05);border:1px solid var(--stroke);color:var(--txt)}
+  .cifra-play.cur{background:var(--tonica);color:#05121a;border-color:transparent}
   #detAudio{width:100%;margin-top:14px}
   .det-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
 
@@ -461,6 +464,7 @@
       <audio id="detAudio" controls style="display:none"></audio>
       <div class="det-actions">
         <button class="btn primary" id="useKeyBtn">✓ Usar esta tonalidade no site</button>
+        <button class="btn" id="saveCifraBtn">💾 Salvar cifra</button>
       </div>
       <div class="chordlist" id="chordList"></div>
     </div>
@@ -1459,9 +1463,27 @@ function useDetectedKey(){
   window.scrollTo({ top:0, behavior:'smooth' });
 }
 
+function chordNotesOf(rootPc, quality){
+  const ivs = quality==='min'?[0,3,7] : quality==='dim'?[0,3,6] : quality==='aug'?[0,4,8] : [0,4,7];
+  return ivs.map(iv=>SHARP_NAMES[(rootPc+iv)%12]);
+}
+function saveDetected(){
+  if(!lastDetection){ toast('Nenhuma cifra detectada ainda.'); return; }
+  if(!state.user){ pendingAction = saveDetected; openAuth(); return; }
+  if(CONFIG.supabaseUrl && !isPro() && readSaved().length >= 3){ requirePro('No plano Free você salva até 3. Assine o Pro para salvar sem limite.'); return; }
+  const res=lastDetection;
+  const chords=res.segments.filter(s=>s.quality!=='N').map(s=>({ name:segName(s), degree:'', notes:chordNotesOf(s.root,s.quality) }));
+  if(!chords.length){ toast('Nada para salvar — nenhum acorde identificado.'); return; }
+  const list=readSaved();
+  list.unshift({ kind:'cifra', name:'Cifra do áudio', tonic:ROOT_LABELS[res.key.root], mode:res.key.mode,
+                 chords, rhythm:state.rhythm, bpm:player.bpm, timbre:state.timbre, distortion:state.distortion, when:Date.now() });
+  writeSaved(list); renderSaved(); toast('Cifra salva! Toque em “▶ Tocar” nas suas cifras.');
+}
+
 function setupDetector(){
   document.getElementById('audioFile').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) analyzeFile(f); });
   document.getElementById('useKeyBtn').addEventListener('click', useDetectedKey);
+  document.getElementById('saveCifraBtn').addEventListener('click', saveDetected);
 }
 
 /* ===== integração de conta/pagamento (opcional) =====
@@ -1559,7 +1581,7 @@ async function doAuth(){
   state.user={ email, name: name || email.split('@')[0] };
   localStorage.setItem('triade_user', JSON.stringify(state.user));
   closeAuth(); renderAccount();
-  if(pendingSave){ pendingSave=false; savePreset(); }
+  if(pendingAction){ const f=pendingAction; pendingAction=null; f(); }
   else { renderSaved(); toast('Bem-vindo(a), '+state.user.name+'!'); }
 }
 function logout(){
@@ -1614,9 +1636,9 @@ function capturePreset(){
     when: Date.now()
   };
 }
-let pendingSave = false;
+let pendingAction = null;
 function savePreset(){
-  if(!state.user){ pendingSave = true; openAuth(); return; }
+  if(!state.user){ pendingAction = savePreset; openAuth(); return; }
   if(CONFIG.supabaseUrl && !isPro() && readSaved().length >= 3){ requirePro('No plano Free você salva até 3 progressões. Assine o Pro para salvar sem limite.'); return; }
   const list=readSaved(); list.unshift(capturePreset()); writeSaved(list);
   renderSaved(); toast('Progressão salva!');
@@ -1651,6 +1673,26 @@ function renderSaved(){
   list.forEach((p,idx)=>{
     const el=document.createElement('div'); el.className='saved-item';
     const mode=p.mode==='maior'?'Maior':'Menor';
+    if(p.kind==='cifra'){
+      el.innerHTML =
+        '<h4>Cifra do áudio</h4>'+
+        '<div class="meta">'+p.tonic+' '+mode+' · '+p.chords.length+' acordes · detectada</div>'+
+        '<div class="cifra-chords">'+p.chords.map(c=>'<span class="cifra-play">'+c.name+'</span>').join('')+'</div>'+
+        '<div class="acts">'+
+          '<button class="btn" data-a="play">▶ Tocar</button>'+
+          '<button class="btn" data-a="txt">Cifra</button>'+
+          '<button class="btn" data-a="print">PDF</button>'+
+          '<button class="btn" data-a="json">JSON</button>'+
+          '<button class="btn" data-a="del">Excluir</button>'+
+        '</div>';
+      el.querySelector('[data-a="play"]').addEventListener('click', function(){ playCifra(p, el, this); });
+      el.querySelector('[data-a="txt"]').addEventListener('click',()=>exportCifra(p));
+      el.querySelector('[data-a="print"]').addEventListener('click',()=>printPreset(p));
+      el.querySelector('[data-a="json"]').addEventListener('click',()=>exportJson(p));
+      el.querySelector('[data-a="del"]').addEventListener('click',()=>{ stopCifra(); const l=readSaved(); l.splice(idx,1); writeSaved(l); renderSaved(); toast('Removida.'); });
+      wrap.appendChild(el);
+      return;
+    }
     el.innerHTML =
       '<h4>'+p.chords.map(c=>c.name).join(' · ')+'</h4>'+
       '<div class="meta">'+p.tonic+' '+mode+' · '+(RHYTHMS[p.rhythm]?RHYTHMS[p.rhythm].name:'')+' · '+p.bpm+' BPM</div>'+
@@ -1668,6 +1710,33 @@ function renderSaved(){
     el.querySelector('[data-a="del"]').addEventListener('click',()=>{ const l=readSaved(); l.splice(idx,1); writeSaved(l); renderSaved(); toast('Removida.'); });
     wrap.appendChild(el);
   });
+}
+let cifraTimer=null;
+function stopCifra(){
+  if(cifraTimer){ clearInterval(cifraTimer); cifraTimer=null; }
+  document.querySelectorAll('.cifra-play.cur').forEach(e=>e.classList.remove('cur'));
+  document.querySelectorAll('[data-a="play"]').forEach(b=>{ b.textContent='▶ Tocar'; });
+}
+function playCifra(p, itemEl, btn){
+  const wasPlaying = itemEl && itemEl.dataset.playing==='1';
+  stopCifra();
+  if(itemEl) itemEl.dataset.playing='0';
+  if(wasPlaying) return;
+  try{ ensureCtx(); }catch(e){ return; }
+  const chords=p.chords||[]; if(!chords.length) return;
+  const bpm=p.bpm||90, barMs=(60/bpm)*4*1000;
+  const tags = itemEl ? itemEl.querySelectorAll('.cifra-play') : [];
+  let i=0;
+  if(itemEl) itemEl.dataset.playing='1';
+  if(btn) btn.textContent='■ Parar';
+  const tick=()=>{
+    if(i>=chords.length){ stopCifra(); return; }
+    try{ playChordAt({ notes:chords[i].notes }, audioCtx.currentTime+0.02, 1.5); }catch(e){}
+    tags.forEach(t=>t.classList.remove('cur'));
+    if(tags[i]) tags[i].classList.add('cur');
+    i++;
+  };
+  tick(); cifraTimer=setInterval(tick, barMs);
 }
 function download(name, text, type){
   const blob=new Blob([text],{type:type||'text/plain;charset=utf-8'});
