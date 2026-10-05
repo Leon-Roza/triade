@@ -35,7 +35,7 @@ MODES_INTERVALS = {
 MAJ_PROFILE = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88]
 MIN_PROFILE = [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17]
 
-MAX_SECONDS = 480  # limita a análise (ex.: 8 min) para manter o tempo de resposta
+MAX_SECONDS = 240  # limita a análise (ex.: 4 min) para manter o tempo de resposta
 
 
 def build_templates():
@@ -89,17 +89,36 @@ def analyze(req: AnalyzeRequest):
 
 def _download_audio(url: str, tmp: str) -> str:
     outtmpl = os.path.join(tmp, "audio.%(ext)s")
+
+    # Cookies opcionais (necessários quando o YouTube bloqueia o IP do servidor).
+    # Defina YT_COOKIES (conteudo do cookies.txt) ou YT_COOKIES_B64 (base64 dele).
+    cookiefile = None
+    raw = os.environ.get("YT_COOKIES", "").strip()
+    b64 = os.environ.get("YT_COOKIES_B64", "").strip()
+    if b64:
+        import base64
+        raw = base64.b64decode(b64).decode("utf-8", "ignore")
+    if raw:
+        cookiefile = os.path.join(tmp, "cookies.txt")
+        with open(cookiefile, "w", encoding="utf-8") as fh:
+            fh.write(raw)
+
     opts = {
         "format": "bestaudio/best",
         "outtmpl": outtmpl,
         "quiet": True,
         "noplaylist": True,
+        "retries": 3,
         "postprocessors": [{
             "key": "FFmpegExtractAudio",
             "preferredcodec": "wav",
             "preferredquality": "192",
         }],
+        "extractor_args": {"youtube": {"player_client": ["android", "web_safari", "tv", "mweb"]}},
     }
+    if cookiefile:
+        opts["cookiefile"] = cookiefile
+
     with yt_dlp.YoutubeDL(opts) as ydl:
         ydl.download([url])
     for name in os.listdir(tmp):
