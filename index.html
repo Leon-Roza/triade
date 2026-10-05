@@ -152,11 +152,60 @@
   .legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:22px;font-size:12.5px;color:var(--muted)}
   .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:7px;vertical-align:middle}
 
+  /* PROGRESSÃO E RITMO */
+  .progression{margin-top:6px;display:grid;grid-template-columns:1.6fr 1fr;gap:16px}
+  .prog-chips{display:flex;flex-wrap:wrap;gap:10px}
+  .pchip{
+    cursor:pointer;font-family:var(--font);color:var(--txt);position:relative;
+    background:rgba(255,255,255,.04);border:1px solid var(--stroke);border-radius:16px;
+    padding:12px 16px 11px 16px;display:flex;flex-direction:column;align-items:flex-start;gap:3px;
+    min-width:78px;transition:.18s cubic-bezier(.2,.9,.3,1.3)
+  }
+  .pchip::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:4px;border-radius:3px;background:var(--accent,var(--tonica))}
+  .pchip:hover{transform:translateY(-3px);background:rgba(255,255,255,.08)}
+  .pchip .pn{font-size:10px;letter-spacing:1px;color:var(--muted)}
+  .pchip .pc{font-family:var(--display);font-size:22px;line-height:1}
+  .pchip .pd{font-size:10.5px;color:var(--accent,var(--tonica));font-weight:700;letter-spacing:.5px}
+  .pchip.playing{
+    border-color:var(--accent,var(--tonica));background:rgba(255,255,255,.11);
+    transform:translateY(-3px) scale(1.06);
+    box-shadow:0 0 0 1px var(--accent,var(--tonica)),0 12px 30px rgba(0,0,0,.5)
+  }
+  .prog-actions{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+  .rhythms{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px}
+  .rhythm-btn{
+    cursor:pointer;font-family:var(--font);font-size:12.5px;font-weight:600;color:var(--txt);
+    border:1px solid var(--stroke);background:rgba(255,255,255,.03);border-radius:11px;
+    padding:10px 8px;transition:.16s
+  }
+  .rhythm-btn:hover{background:rgba(255,255,255,.08)}
+  .rhythm-btn.active{border-color:transparent;color:#0d0620;background:linear-gradient(135deg,var(--sub),#d6c7ff);font-weight:700}
+  .tempo-row{display:flex;align-items:center;gap:12px;margin-top:12px;font-size:12.5px;color:var(--muted)}
+  .tempo-row > label{min-width:74px}
+  .tempo-val{min-width:66px;text-align:right;color:var(--txt);font-weight:600}
+  input[type=range]{-webkit-appearance:none;appearance:none;flex:1;height:5px;border-radius:99px;background:rgba(255,255,255,.15);outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--tonica);cursor:pointer;box-shadow:0 0 12px rgba(34,211,238,.7)}
+  input[type=range]::-moz-range-thumb{width:18px;height:18px;border:none;border-radius:50%;background:var(--tonica);cursor:pointer}
+  select{font-family:var(--font);background:#0e0e1a;color:var(--txt);border:1px solid var(--stroke);border-radius:10px;padding:8px 10px;font-size:13px}
+  .check{display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none}
+  .check input{accent-color:var(--tonica);width:16px;height:16px}
+
+  /* BRAÇO */
+  .fretboard-sec{margin-top:6px}
+  .fb-wrap{background:var(--panel);border:1px solid var(--stroke);border-radius:22px;padding:16px 14px;overflow-x:auto;backdrop-filter:blur(10px)}
+  #fretboard{width:100%;min-width:660px;height:auto;display:block}
+  .fb-legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:14px;font-size:12.5px;color:var(--muted);align-items:center}
+  .fb-legend .m{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:7px;vertical-align:middle}
+  .fb-legend .m.root{background:conic-gradient(var(--tonica),var(--sub),var(--dom),var(--tonica))}
+  .fb-legend .m.tone{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.5)}
+  .fb-hint{margin-left:auto}
+
   footer{margin-top:60px;text-align:center;color:var(--muted);font-size:12px;line-height:1.7}
 
   @media (max-width:900px){
     .controls{grid-template-columns:1fr}
     .stage{grid-template-columns:1fr}
+    .progression{grid-template-columns:1fr}
     .hub .root{font-size:52px}
     .brand h1{font-size:24px}
   }
@@ -235,6 +284,55 @@
     <span><i style="background:var(--dom)"></i>Dominante (tensão)</span>
   </div>
 
+  <div class="grid-title">
+    <h2>Progressão de exemplo</h2>
+    <span id="progName">—</span>
+  </div>
+  <section class="progression">
+    <div class="panel">
+      <h2>Progressão gerada</h2>
+      <div class="prog-chips" id="progChips"></div>
+      <div class="prog-actions">
+        <button class="btn" id="newProgBtn">🎲 Nova progressão</button>
+        <button class="btn primary" id="playProgBtn">▶ Tocar</button>
+        <button class="btn" id="stopProgBtn" disabled>■ Parar</button>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Ritmo &amp; andamento</h2>
+      <div class="rhythms" id="rhythmBtns"></div>
+      <div class="tempo-row">
+        <label for="tempo">Andamento</label>
+        <input type="range" id="tempo" min="45" max="200" step="1" value="90" />
+        <span id="tempoVal" class="tempo-val">90 BPM</span>
+      </div>
+      <div class="tempo-row">
+        <label for="meter">Compasso</label>
+        <select id="meter">
+          <option value="4">4/4</option>
+          <option value="3">3/4</option>
+          <option value="2">2/4</option>
+        </select>
+        <label class="check"><input type="checkbox" id="metroChk" /> metrônomo</label>
+      </div>
+    </div>
+  </section>
+
+  <div class="grid-title">
+    <h2>Braço do instrumento</h2>
+    <span id="fbChord">—</span>
+  </div>
+  <section class="fretboard-sec">
+    <div class="fb-wrap">
+      <svg id="fretboard" viewBox="0 0 980 300" role="img" aria-label="Braço do instrumento com as notas do acorde"></svg>
+    </div>
+    <div class="fb-legend">
+      <span><i class="m root"></i>Fundamental</span>
+      <span><i class="m tone"></i>Demais notas do acorde</span>
+      <span class="fb-hint">Afinação padrão E–A–D–G–B–E · 12 casas</span>
+    </div>
+  </section>
+
   <footer>
     TRÍADE · campo harmônico interativo para guitarristas e violonistas.<br />
     Dica: use um capotraste para transformar shapes fáceis em qualquer tonalidade.
@@ -288,7 +386,7 @@ function spellScale(tonic, intervals){
 }
 
 /* ============ ESTADO ============ */
-const state = { tonic: TONICS[0], mode: 'maior', selected: 0 };
+const state = { tonic: TONICS[0], mode: 'maior', selected: 0, rhythm: 'baixoAcorde', progression: null };
 let current = {};
 
 function build(){
@@ -313,6 +411,8 @@ function build(){
     });
   }
   current = {mode, scale, chords};
+  if(!state.progression) pickProgression();
+  resolveProgression();
   render();
 }
 
@@ -401,6 +501,7 @@ function renderDetail(){
 
   // destaca chip correspondente
   document.querySelectorAll('.chip').forEach((el,idx)=>el.classList.toggle('active', idx===state.selected));
+  if(!player.playing) renderFretboard(c);
 }
 
 function renderGrid(){
@@ -424,6 +525,8 @@ function render(){
   renderWheel();
   renderGrid();
   renderDetail();
+  renderProgression();
+  renderFretboard(current.chords[state.selected]);
 }
 
 function select(i, play){
@@ -504,8 +607,267 @@ function strumTonality(){
 document.getElementById('playBtn').addEventListener('click', ()=>playChord(current.chords[state.selected]));
 document.getElementById('strumBtn').addEventListener('click', strumTonality);
 
+/* ============ PROGRESSÃO ============ */
+const PROG_TEMPLATES = [
+  {name:'Pop · I–V–vi–IV',        degs:[0,4,5,3]},
+  {name:'Anos 50 · I–vi–IV–V',    degs:[0,5,3,4]},
+  {name:'Balada · vi–IV–I–V',     degs:[5,3,0,4]},
+  {name:'Jazz · ii–V–I–vi',       degs:[1,4,0,5]},
+  {name:'Rock · I–IV–V–V',        degs:[0,3,4,4]},
+  {name:'Sertanejo · I–IV–I–V',   degs:[0,3,0,4]},
+  {name:'Gospel · I–iii–IV–V',    degs:[0,2,3,4]},
+  {name:'Clássico · I–IV–V–I',    degs:[0,3,4,0]},
+  {name:'Emocional · vi–V–IV–V',  degs:[5,4,3,4]},
+  {name:'Turnaround · I–vi–ii–V', degs:[0,5,1,4]},
+  {name:'Cânone · I–V–vi–iii',    degs:[0,4,5,2]},
+  {name:'Blues · 12 compassos',   degs:[0,0,0,0,3,3,0,0,4,3,0,4]}
+];
+
+function pickProgression(){
+  const t = PROG_TEMPLATES[Math.floor(Math.random()*PROG_TEMPLATES.length)];
+  state.progression = { tpl:t.name, degrees:t.degs.slice() };
+}
+function resolveProgression(){
+  current.progressionChords = state.progression.degrees.map(d=>current.chords[d]);
+}
+function renderProgression(){
+  const wrap = document.getElementById('progChips');
+  if(!wrap || !current.progressionChords) return;
+  wrap.innerHTML = '';
+  current.progressionChords.forEach((c,i)=>{
+    const b = document.createElement('button');
+    b.className = 'pchip';
+    b.style.setProperty('--accent', FUNC_COLOR[c.func]);
+    b.innerHTML = `<span class="pn">${i+1}º</span><span class="pc">${c.pretty}</span><span class="pd">${c.degree}</span>`;
+    b.addEventListener('click', ()=>select(state.progression.degrees[i], true));
+    wrap.appendChild(b);
+  });
+  document.getElementById('progName').textContent =
+    state.progression.tpl + '  →  ' + current.progressionChords.map(c=>c.degree).join(' – ');
+}
+function highlightProgression(bar){
+  document.querySelectorAll('.pchip').forEach((el,i)=>el.classList.toggle('playing', i===bar));
+}
+
+/* ============ RITMOS ============ */
+const RHYTHMS = {
+  acordes:     {name:'Acordes',        gen:n=>{const a=new Array(n*2).fill(null); for(let b=0;b<n;b++) a[b*2]={t:'chord',len:1.75}; return a;}},
+  baixoAcorde: {name:'Baixo + acorde', gen:n=>{const a=new Array(n*2).fill(null); for(let b=0;b<n;b++) a[b*2]=(b%2===0)?{t:'bass',len:1.4}:{t:'chord',len:1.75}; return a;}},
+  arpejo:      {name:'Arpejo',         gen:n=>{const a=new Array(n*2).fill(null); const seq=['b',0,1,2,1,0]; for(let s=0;s<n*2;s++) a[s]={t:'arp',i:seq[s%seq.length],len:1.5}; return a;}},
+  valsa:       {name:'Valsa',          gen:n=>{const a=new Array(n*2).fill(null); a[0]={t:'bass',len:1.4}; for(let b=1;b<n;b++) a[b*2]={t:'chord',len:1.75}; return a;}},
+  bossa:       {name:'Bossa',          gen:n=>{ if(n!==4) return RHYTHMS.baixoAcorde.gen(n); const a=new Array(8).fill(null); a[0]={t:'bass',len:1.2}; a[1]={t:'chord',len:1.1}; a[3]={t:'chord',len:1.3}; a[4]={t:'bass',len:1.2}; a[5]={t:'chord',len:1.1}; a[7]={t:'chord',len:1.3}; return a;}},
+  rock:        {name:'Rock',           gen:n=>{const a=new Array(n*2).fill(null); for(let s=0;s<n*2;s++) a[s]={t:'chord',len:0.85}; return a;}},
+  offbeat:     {name:'Off-beat',       gen:n=>{const a=new Array(n*2).fill(null); for(let s=1;s<n*2;s+=2) a[s]={t:'chord',len:0.9}; return a;}},
+  samba:       {name:'Samba',          gen:n=>{ if(n!==4) return RHYTHMS.baixoAcorde.gen(n); const a=new Array(8).fill(null); a[0]={t:'bass',len:1.2}; a[2]={t:'chord',len:1.05}; a[3]={t:'chord',len:1.05}; a[4]={t:'bass',len:1.2}; a[6]={t:'chord',len:1.05}; a[7]={t:'chord',len:1.05}; return a;}}
+};
+
+/* ============ ÁUDIO (motor de progressão) ============ */
+const SHARP_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+function parsePC(name){
+  const m = String(name).match(/^([A-Ga-g])(#{1,2}|b{1,2})?/);
+  if(!m) return 0;
+  let v = LETTER_SEMI[m[1].toUpperCase()];
+  const acc = m[2] || '';
+  for(const ch of acc) v += ch==='#' ? 1 : -1;
+  return ((v % 12) + 12) % 12;
+}
+function voicingOf(chord){
+  const pcs = chord.notes.map(parsePC);
+  const base = (3+1)*12 + pcs[0];
+  const midis = [base];
+  for(let k=1;k<3;k++){
+    const prev = midis[k-1];
+    let up = ((pcs[k] - (prev % 12)) % 12 + 12) % 12;
+    if(up === 0) up = 12;
+    midis.push(prev + up);
+  }
+  return { bass: base-12, midis };
+}
+function ensureCtx(){
+  audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+  if(audioCtx.state === 'suspended') audioCtx.resume();
+}
+function tone(midi, t, dur, gain, type){
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  osc.type = type || 'triangle';
+  osc.frequency.value = 440 * Math.pow(2, (midi-69)/12);
+  const a = 0.012;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(gain, t + a);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + Math.max(a + 0.06, dur));
+  osc.connect(g).connect(audioCtx.destination);
+  osc.start(t);
+  osc.stop(t + dur + 0.06);
+}
+function playChordAt(chord, t, dur){
+  const v = voicingOf(chord);
+  v.midis.forEach((m,i)=>tone(m, t + i*0.004, Math.min(dur,1.7), 0.11, 'triangle'));
+}
+function playBassAt(chord, t, dur){
+  const v = voicingOf(chord);
+  tone(v.bass, t, Math.min(dur,1.7), 0.20, 'sine');
+}
+function playArpAt(chord, role, t, dur){
+  const v = voicingOf(chord);
+  const m = role === 'b' ? v.bass : v.midis[role];
+  tone(m, t, Math.min(dur,1.2), 0.15, 'triangle');
+}
+function metroClick(t, accent){
+  tone(accent ? 84 : 81, t, 0.05, accent ? 0.09 : 0.05, 'square');
+}
+
+/* scheduler com relógio de áudio */
+const player = { playing:false, timer:null, nextTime:0, step:0, bpm:90, beats:4, metro:false };
+let uiTimers = [];
+const stepDuration = ()=> 60 / player.bpm / 2;
+
+function scheduleUI(fn, time){
+  const id = setTimeout(fn, Math.max(0, (time - audioCtx.currentTime) * 1000));
+  uiTimers.push(id);
+}
+function scheduleStep(globalStep, time){
+  const steps = player.beats * 2;
+  const local = ((globalStep % steps) + steps) % steps;
+  const prog = current.progressionChords;
+  const bar = Math.floor(globalStep / steps) % prog.length;
+  const chord = prog[bar];
+  const ev = RHYTHMS[state.rhythm].gen(player.beats)[local];
+  const sd = stepDuration();
+
+  if(player.metro && local % 2 === 0) metroClick(time, local === 0);
+  if(ev){
+    const dur = ev.len * sd;
+    if(ev.t === 'chord') playChordAt(chord, time, dur);
+    else if(ev.t === 'bass') playBassAt(chord, time, dur);
+    else if(ev.t === 'arp') playArpAt(chord, ev.i, time, dur);
+  }
+  if(local === 0){
+    scheduleUI(()=>{ highlightProgression(bar); renderFretboard(chord); }, time);
+  }
+}
+function scheduleTick(){
+  if(!player.playing) return;
+  const ahead = 0.12;
+  while(player.nextTime < audioCtx.currentTime + ahead){
+    scheduleStep(player.step, player.nextTime);
+    player.nextTime += stepDuration();
+    player.step++;
+  }
+}
+function startProgression(){
+  stopProgression();
+  try{ ensureCtx(); }catch(e){ return; }
+  player.playing = true;
+  player.step = 0;
+  player.nextTime = audioCtx.currentTime + 0.15;
+  player.timer = setInterval(scheduleTick, 25);
+  scheduleTick();
+  document.getElementById('playProgBtn').disabled = true;
+  document.getElementById('stopProgBtn').disabled = false;
+}
+function stopProgression(){
+  player.playing = false;
+  if(player.timer){ clearInterval(player.timer); player.timer = null; }
+  uiTimers.forEach(clearTimeout); uiTimers = [];
+  const p = document.getElementById('playProgBtn');
+  const s = document.getElementById('stopProgBtn');
+  if(p) p.disabled = false;
+  if(s) s.disabled = true;
+  document.querySelectorAll('.pchip').forEach(e=>e.classList.remove('playing'));
+  if(current.chords) renderFretboard(current.chords[state.selected]);
+}
+
+/* ============ BRAÇO (FRETBOARD) ============ */
+function renderFretboard(chord){
+  const svg = document.getElementById('fretboard');
+  if(!svg || !chord) return;
+  svg.innerHTML = '';
+  const NS = SVGNS;
+  const W = 980, H = 300, left = 82, right = W - 22, top = 34, bottom = H - 44;
+  const openPC = [4,9,2,7,11,4];
+  const labels = ['E','A','D','G','B','E'];
+  const nStrings = 6, nFrets = 12;
+  const fretW = (right - left) / nFrets;
+  const gap = (bottom - top) / (nStrings - 1);
+  const pcs = chord.notes.map(parsePC);
+  const rootPc = pcs[0];
+  const accent = FUNC_COLOR[chord.func];
+  const mk = (tag,attrs)=>{ const e = document.createElementNS(NS, tag); for(const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+
+  svg.appendChild(mk('rect',{x:left-3,y:top-3,width:6,height:bottom-top+6,rx:3,fill:'#e9e9f2'}));
+  for(let f=1; f<=nFrets; f++){
+    const x = left + f*fretW;
+    svg.appendChild(mk('line',{x1:x,y1:top,x2:x,y2:bottom,stroke:'rgba(255,255,255,.20)','stroke-width':1.4}));
+  }
+  for(let i=0;i<nStrings;i++){
+    const y = top + i*gap;
+    svg.appendChild(mk('line',{x1:left,y1:y,x2:right,y2:y,stroke:'rgba(255,255,255,.34)','stroke-width':(1 + (5-i)*0.35).toFixed(2)}));
+    const t = mk('text',{x:left-50,y:y+5,'text-anchor':'middle',fill:'#8a8aa3','font-size':14,'font-weight':600,'font-family':'Space Grotesk, system-ui, sans-serif'});
+    t.textContent = labels[i]; svg.appendChild(t);
+  }
+  for(let f=1; f<=nFrets; f++){
+    const t = mk('text',{x:left+(f-0.5)*fretW,y:bottom+26,'text-anchor':'middle',fill:'#6b6b83','font-size':12,'font-family':'Space Grotesk, system-ui, sans-serif'});
+    t.textContent = f; svg.appendChild(t);
+  }
+  const midY = (top + bottom) / 2;
+  [3,5,7,9].forEach(f=> svg.appendChild(mk('circle',{cx:left+(f-0.5)*fretW,cy:midY,r:5,fill:'rgba(255,255,255,.13)'})));
+  [1.5,3.5].forEach(k=> svg.appendChild(mk('circle',{cx:left+(12-0.5)*fretW,cy:top+k*gap,r:5,fill:'rgba(255,255,255,.13)'})));
+
+  for(let i=0;i<nStrings;i++){
+    for(let f=0; f<=nFrets; f++){
+      const pc = (openPC[i] + f) % 12;
+      if(!pcs.includes(pc)) continue;
+      const x = f===0 ? left-30 : left + (f-0.5)*fretW;
+      const y = top + i*gap;
+      const isRoot = pc === rootPc;
+      svg.appendChild(mk('circle',{cx:x,cy:y,r:11,fill:isRoot?accent:'rgba(255,255,255,.07)',stroke:isRoot?'none':'rgba(255,255,255,.42)','stroke-width':1.4}));
+      const t = mk('text',{x:x,y:y+4,'text-anchor':'middle','font-size':10.5,'font-weight':700,'font-family':'Space Grotesk, system-ui, sans-serif',fill:isRoot?'#06121a':'#e9e9f2'});
+      t.textContent = SHARP_NAMES[pc]; svg.appendChild(t);
+    }
+  }
+  document.getElementById('fbChord').textContent =
+    chord.pretty + '  ·  ' + chord.notes.join(' · ') + '  (' + QUAL_LABEL[chord.quality] + ')';
+}
+
+/* ============ CONTROLES DA PROGRESSÃO ============ */
+function buildProgressionControls(){
+  const rb = document.getElementById('rhythmBtns');
+  Object.entries(RHYTHMS).forEach(([key,r])=>{
+    const b = document.createElement('button');
+    b.className = 'rhythm-btn' + (key===state.rhythm ? ' active' : '');
+    b.textContent = r.name;
+    b.addEventListener('click', ()=>{
+      state.rhythm = key;
+      document.querySelectorAll('.rhythm-btn').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+    });
+    rb.appendChild(b);
+  });
+
+  const tempo = document.getElementById('tempo');
+  const tv = document.getElementById('tempoVal');
+  tempo.value = player.bpm; tv.textContent = player.bpm + ' BPM';
+  tempo.addEventListener('input', ()=>{ player.bpm = +tempo.value; tv.textContent = player.bpm + ' BPM'; });
+
+  const meter = document.getElementById('meter');
+  meter.value = String(player.beats);
+  meter.addEventListener('change', ()=>{ player.beats = +meter.value; });
+
+  document.getElementById('metroChk').addEventListener('change', e=>{ player.metro = e.target.checked; });
+
+  document.getElementById('newProgBtn').addEventListener('click', ()=>{
+    if(player.playing) stopProgression();
+    pickProgression(); resolveProgression(); renderProgression();
+  });
+  document.getElementById('playProgBtn').addEventListener('click', startProgression);
+  document.getElementById('stopProgBtn').addEventListener('click', stopProgression);
+}
+
 /* ============ START ============ */
 buildControls();
+buildProgressionControls();
 build();
 </script>
 </body>
