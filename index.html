@@ -228,6 +228,32 @@
   #detAudio{width:100%;margin-top:14px}
   .det-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
 
+  /* PLANOS */
+  .header-cta{font-size:13px;padding:11px 18px;white-space:nowrap}
+  .plans-intro{text-align:center;max-width:660px;margin:6px auto 20px;color:var(--muted);font-size:14px;line-height:1.6}
+  .billing{display:flex;justify-content:center;gap:6px;margin:0 auto 30px;background:var(--panel);border:1px solid var(--stroke);border-radius:999px;padding:5px;width:max-content}
+  .bill-opt{cursor:pointer;border:0;background:transparent;color:var(--muted);font-family:var(--font);font-size:13px;font-weight:600;padding:9px 18px;border-radius:999px;transition:.16s}
+  .bill-opt.active{background:linear-gradient(135deg,var(--tonica),#7fe9ff);color:#05121a}
+  .bill-opt .tag{font-size:10px;margin-left:6px;color:var(--dom)}
+  .bill-opt.active .tag{color:#05121a}
+  .plans{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;align-items:start;max-width:1040px;margin:0 auto}
+  .plan{background:var(--panel);border:1px solid var(--stroke);border-radius:22px;padding:28px 22px;display:flex;flex-direction:column;position:relative;transition:.2s}
+  .plan:hover{transform:translateY(-4px);border-color:rgba(255,255,255,.22)}
+  .plan.pop{border-color:var(--tonica);box-shadow:0 24px 60px rgba(34,211,238,.18);background:linear-gradient(180deg,rgba(34,211,238,.08),rgba(255,255,255,.03))}
+  .plan .pop-tag{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,var(--tonica),var(--sub));color:#05121a;font-size:11px;font-weight:700;letter-spacing:1px;padding:5px 14px;border-radius:999px;white-space:nowrap}
+  .plan h3{font-family:var(--display);font-size:19px}
+  .plan .tagline{color:var(--muted);font-size:12.5px;min-height:36px;margin-top:4px}
+  .plan .price{display:flex;align-items:baseline;gap:4px;margin:16px 0 2px}
+  .plan .cur{font-size:15px;color:var(--muted)}
+  .plan .amount{font-family:var(--display);font-size:42px;line-height:1}
+  .plan .period{color:var(--muted);font-size:13px}
+  .plan .save{font-size:11px;color:var(--dom);font-weight:700;min-height:15px}
+  .plan ul{list-style:none;display:flex;flex-direction:column;gap:10px;margin:18px 0 22px;font-size:13.5px}
+  .plan li{display:flex;gap:9px;line-height:1.35}
+  .plan li::before{content:"✓";color:var(--tonica);font-weight:700;flex:0 0 auto}
+  .plan .cta{margin-top:auto;display:flex;justify-content:center;text-align:center}
+  .plans-foot{text-align:center;color:var(--muted);font-size:12px;margin-top:22px;line-height:1.7}
+
   footer{margin-top:60px;text-align:center;color:var(--muted);font-size:12px;line-height:1.7}
 
   @media (max-width:900px){
@@ -235,6 +261,8 @@
     .stage{grid-template-columns:1fr}
     .progression{grid-template-columns:1fr}
     .sound-row{grid-template-columns:1fr}
+    .plans{grid-template-columns:1fr}
+    .header-cta{display:none}
     .hub .root{font-size:52px}
     .brand h1{font-size:24px}
   }
@@ -256,6 +284,7 @@
       </div>
     </div>
     <div class="tempo"><span class="dot"></span> escolha o tom e toque</div>
+    <a class="btn header-cta" href="#planos">Ver planos</a>
   </header>
 
   <section class="controls">
@@ -388,7 +417,7 @@
     <h2>Analisar harmonia</h2>
     <span id="detStatus">envie um áudio para detectar acordes e tonalidade</span>
   </div>
-  <section class="detector panel">
+  <section class="detector panel" id="analisar">
     <div class="det-input">
       <label>Envie um áudio (mp3, wav, m4a, ogg)</label>
       <input type="file" id="audioFile" accept="audio/*" />
@@ -404,6 +433,65 @@
       <div class="chordlist" id="chordList"></div>
     </div>
   </section>
+
+  <div class="grid-title" id="planos">
+    <h2>Planos</h2>
+    <span>comece grátis e evolua quando quiser</span>
+  </div>
+  <p class="plans-intro">Todo o essencial para estudar guitarra e violão em um só lugar. Cancele quando quiser, sem burocracia.</p>
+  <div class="billing" id="billing">
+    <button class="bill-opt active" data-bill="mensal">Mensal</button>
+    <button class="bill-opt" data-bill="anual">Anual<span class="tag">2 meses grátis</span></button>
+  </div>
+  <section class="plans">
+    <div class="plan">
+      <h3>Grátis</h3>
+      <p class="tagline">Para começar a estudar harmonia hoje mesmo.</p>
+      <div class="price"><span class="cur">R$</span><span class="amount" data-mensal="0" data-anual="0">0</span><span class="period">/mês</span></div>
+      <span class="save"></span>
+      <ul>
+        <li>Disco e campo harmônico (12 tons, 3 escalas)</li>
+        <li>Progressões de exemplo e ritmos</li>
+        <li>3 timbres + braço do instrumento</li>
+        <li>Análise de harmonia por upload (limitada)</li>
+      </ul>
+      <a class="btn cta" href="#analisar">Começar agora</a>
+    </div>
+
+    <div class="plan pop">
+      <span class="pop-tag">MAIS POPULAR</span>
+      <h3>Pro</h3>
+      <p class="tagline">Para quem toca, compõe e quer tudo liberado.</p>
+      <div class="price"><span class="cur">R$</span><span class="amount" data-mensal="19" data-anual="149">19</span><span class="period">/mês</span></div>
+      <span class="save" style="display:none">economize 37% no anual</span>
+      <ul>
+        <li>Tudo do plano Grátis</li>
+        <li>Análise de harmonia ilimitada (arquivo e YouTube)</li>
+        <li>Salvar e organizar suas progressões</li>
+        <li>Exportar cifra, PDF e tablatura</li>
+        <li>Timbres e efeitos extras (distorções, ambiência)</li>
+        <li>Sem anúncios + suporte por e-mail</li>
+      </ul>
+      <a class="btn primary cta" href="mailto:contato@triade.app?subject=Quero%20o%20plano%20Pro">Assinar Pro</a>
+    </div>
+
+    <div class="plan">
+      <h3>Professor / Studio</h3>
+      <p class="tagline">Para professores, escolas, igrejas e estúdios.</p>
+      <div class="price"><span class="cur">R$</span><span class="amount" data-mensal="49" data-anual="499">49</span><span class="period">/mês</span></div>
+      <span class="save" style="display:none">economize 15% no anual</span>
+      <ul>
+        <li>Tudo do plano Pro</li>
+        <li>Até 10 alunos/usuários</li>
+        <li>Painel do professor e planos de aula</li>
+        <li>Licença comercial para aulas e igrejas</li>
+        <li>Marca própria (white-label) opcional</li>
+        <li>Suporte prioritário</li>
+      </ul>
+      <a class="btn cta" href="mailto:contato@triade.app?subject=Plano%20Professor%2FStudio">Falar com vendas</a>
+    </div>
+  </section>
+  <p class="plans-foot">Pagamento seguro via cartão, Pix ou boleto · 7 dias de garantia · sem fidelidade<br />Dúvidas? Fale com a gente em <b>contato@triade.app</b></p>
 
   <footer>
     TRÍADE · campo harmônico interativo para guitarristas e violonistas.<br />
@@ -1326,11 +1414,24 @@ function setupDetector(){
   document.getElementById('useKeyBtn').addEventListener('click', useDetectedKey);
 }
 
+function setupPlans(){
+  const opts=document.querySelectorAll('.bill-opt');
+  opts.forEach(b=>b.addEventListener('click', ()=>{
+    opts.forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    const annual = b.dataset.bill==='anual';
+    document.querySelectorAll('.plan .amount').forEach(a=>{ a.textContent = annual ? a.dataset.anual : a.dataset.mensal; });
+    document.querySelectorAll('.plan .period').forEach(p=>{ p.textContent = annual ? '/ano' : '/mês'; });
+    document.querySelectorAll('.plan .save').forEach(s=>{ s.style.display = (annual && s.textContent.trim()) ? 'inline-block' : 'none'; });
+  }));
+}
+
 /* ============ START ============ */
 buildControls();
 buildProgressionControls();
 buildSoundControls();
 setupDetector();
+setupPlans();
 build();
 </script>
 </body>
