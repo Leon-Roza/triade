@@ -1621,6 +1621,7 @@ async function initAuth(){
       const { data } = await supa.auth.getSession();
       if(data && data.session) await setUserFromSession(data.session);
       supa.auth.onAuthStateChange((_e, s)=>{ if(s) setUserFromSession(s); else { state.user=null; state.plan='free'; renderAccount(); renderSaved(); } });
+      window.addEventListener('focus', ()=>{ supa.auth.getSession().then(({data})=>{ if(data && data.session) setUserFromSession(data.session); }).catch(()=>{}); });
     }catch(e){ supa=null; }
   }
   renderAccount(); renderSaved();
