@@ -1199,8 +1199,9 @@ function buildProgressionControls(){
     b.textContent = r.name;
     b.addEventListener('click', ()=>{
       state.rhythm = key;
-      document.querySelectorAll('.rhythm-btn').forEach(x=>x.classList.remove('active'));
+      rb.querySelectorAll('.rhythm-btn').forEach(x=>x.classList.remove('active'));
       b.classList.add('active');
+      if(state.melody) generateMelody();
     });
     rb.appendChild(b);
   });
@@ -1212,7 +1213,7 @@ function buildProgressionControls(){
 
   const meter = document.getElementById('meter');
   meter.value = String(player.beats);
-  meter.addEventListener('change', ()=>{ player.beats = +meter.value; });
+  meter.addEventListener('change', ()=>{ player.beats = +meter.value; if(state.melody) generateMelody(); });
 
   document.getElementById('metroChk').addEventListener('change', e=>{ player.metro = e.target.checked; });
 
@@ -1544,19 +1545,30 @@ function scaleMidis(baseOct){
   for(let o=baseOct;o<=baseOct+1;o++) pcs.forEach(pc=>out.push((o+1)*12+pc));
   return out.sort((a,b)=>a-b);
 }
-function onsetsFor(beats, density){
-  const o=[];
-  if(density==='simples'){ for(let b=0;b<beats;b+=2) o.push(b); }
-  else if(density==='rapida'){ for(let b=0;b<beats;b+=0.5) o.push(b); }
-  else { for(let b=0;b<beats;b++) o.push(b); }
-  return o;
+function melodyOnsets(beats, rhythmKey, density){
+  const events = (RHYTHMS[rhythmKey]||RHYTHMS.acordes).gen(beats);
+  const grid=[];
+  for(let s=0;s<events.length;s++){ if(events[s]) grid.push(s/2); }
+  let onsets;
+  if(density==='simples'){
+    onsets = grid.filter(b=>Math.abs(b-Math.round(b))<1e-6 && Math.round(b)%2===0);
+    if(!onsets.length) onsets = [0];
+  } else if(density==='rapida'){
+    const extra=[]; grid.forEach(b=>{ extra.push(b); extra.push(b+0.5); });
+    onsets = extra;
+  } else {
+    onsets = grid.slice();
+  }
+  onsets = Array.from(new Set(onsets.map(b=>Math.round(b*2)/2))).filter(b=>b>=0 && b<beats).sort((a,b)=>a-b);
+  if(!onsets.length) onsets=[0];
+  return onsets;
 }
 function generateMelody(){
   const beats = player.beats;
   const baseOct = (REGISTERS[state.register]||REGISTERS.media).oct;
   const midis = scaleMidis(baseOct);
   const chords = current.progressionChords;
-  const onsets = onsetsFor(beats, state.density);
+  const onsets = melodyOnsets(beats, state.rhythm, state.density);
   const pcNames = scalePcNames();
   const notes=[]; let prev=midis[Math.floor(midis.length/2)];
   chords.forEach((chord, bar)=>{
@@ -1576,10 +1588,10 @@ function generateMelody(){
     });
   });
   state.melody = { notes, chords: chords.map(c=>({name:c.pretty, degree:c.degree, notes:c.notes, func:c.func})),
-                   bpm:player.bpm, beats, timbre:state.timbre, distortion:state.distortion,
-                   tonic:state.tonic.label, mode:state.mode, density:state.density, register:state.register };
+                   bpm:player.bpm, beats, rhythm:state.rhythm, timbre:state.timbre, distortion:state.distortion,
+                   tonic:state.tonic.label, mode:state.mode, density:state.density, register:state.register, live:true };
   renderMelody();
-  setMelodyStatus('melodia gerada · '+notes.filter(n=>!n.rest).length+' notas · '+state.tonic.label+' '+(state.mode==='maior'?'Maior':'Menor'));
+  setMelodyStatus('melodia gerada · '+notes.filter(n=>!n.rest).length+' notas · '+state.tonic.label+' '+(state.mode==='maior'?'Maior':'Menor')+' · '+(RHYTHMS[state.rhythm]?RHYTHMS[state.rhythm].name:'')+' · '+player.bpm+' BPM');
 }
 function renderMelody(){
   const out=document.getElementById('melodyOut'); if(!out) return;
@@ -1611,17 +1623,28 @@ function playMelody(){
   stopMelody(); stopCifra();
   try{ ensureCtx(); }catch(e){ return; }
   const m=state.melody;
-  const beatMs = 60000/(m.bpm||90);
+  const bpm = (m.live===false && m.bpm) ? m.bpm : player.bpm;   // andamento ao vivo no compositor
+  const beatMs = 60000/(bpm||90);
   const barMs = beatMs*m.beats;
+  const stepMs = beatMs/2;
   const acc = document.getElementById('accChk') ? document.getElementById('accChk').checked : true;
   const events=[];
   m.chords.forEach((c,bar)=>{
-    if(acc) events.push({ t:bar*barMs, fn:()=>{ try{ playChordAt({notes:c.notes}, audioCtx.currentTime+0.01, (m.beats*beatMs/1000)*0.9); }catch(e){} } });
+    if(acc){
+      const pat=(RHYTHMS[m.rhythm||state.rhythm]||RHYTHMS.acordes).gen(m.beats);
+      const chord={notes:c.notes};
+      pat.forEach((ev,s)=>{
+        if(!ev) return;
+        const t=bar*barMs + s*stepMs, dur=ev.len*stepMs;
+        if(ev.t==='chord') events.push({t, fn:()=>{ try{ playChordAt(chord, audioCtx.currentTime+0.01, dur/1000); }catch(e){} }});
+        else if(ev.t==='bass') events.push({t, fn:()=>{ try{ playBassAt(chord, audioCtx.currentTime+0.01, dur/1000); }catch(e){} }});
+        else if(ev.t==='arp') events.push({t, fn:()=>{ try{ playArpAt(chord, ev.i, audioCtx.currentTime+0.01, dur/1000); }catch(e){} }});
+      });
+    }
     m.notes.filter(n=>n.bar===bar).forEach((n,idx)=>{
       events.push({ t:bar*barMs + n.beat*beatMs, fn:()=>{
         document.querySelectorAll('.mnote.cur').forEach(e=>e.classList.remove('cur'));
-        const rows=document.querySelectorAll('.mbar');
-        const row=rows[bar];
+        const row=document.querySelectorAll('.mbar')[bar];
         if(row){ const els=row.querySelectorAll('.mnote'); if(els[idx]) els[idx].classList.add('cur'); }
         if(!n.rest){ try{ pluckVoice(n.midi, audioCtx.currentTime+0.01, Math.min(0.95, beatMs/1000*0.95), 0.15); }catch(e){} }
       }});
@@ -1629,7 +1652,7 @@ function playMelody(){
   });
   events.sort((a,b)=>a.t-b.t);
   events.forEach(ev=> melodyTimers.push(setTimeout(ev.fn, Math.max(0, ev.t))));
-  melodyTimers.push(setTimeout(stopMelody, barMs*m.chords.length + 700));
+  melodyTimers.push(setTimeout(stopMelody, barMs*m.chords.length + 800));
   document.getElementById('playMelodyBtn').disabled=true;
   document.getElementById('stopMelodyBtn').disabled=false;
 }
@@ -1661,7 +1684,7 @@ function saveMelody(){
   writeSaved(list); renderSaved(); toast('Melodia salva!');
 }
 function loadMelodyFrom(p){
-  state.melody = { notes:p.melody, chords:p.chords, bpm:p.bpm, beats:p.beats, timbre:p.timbre, tonic:p.tonic, mode:p.mode, density:state.density, register:state.register };
+  state.melody = { notes:p.melody, chords:p.chords, bpm:p.bpm, beats:p.beats, timbre:p.timbre, tonic:p.tonic, mode:p.mode, density:state.density, register:state.register, rhythm:p.rhythm||state.rhythm, live:false };
   renderMelody();
   const c=document.getElementById('compositor'); if(c) c.scrollIntoView({behavior:'smooth'});
   playMelody();
