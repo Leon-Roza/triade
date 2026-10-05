@@ -68,7 +68,7 @@ corda de verdade e detecção por áudio.
 
 ### 2.5 E-mail profissional
 - **Zoho Mail** (plano grátis com domínio próprio) ou **Google Workspace** (pago).
-- Endereços: `contato@`, `suporte@`, `vendas@`.
+- Endereços: `triadestudio@usetriade.com.br` (contato/suporte/vendas).
 
 ### 2.6 Pagamentos
 - **Kiwify / Hotmart / Cakto**: mais simples no Brasil (Pix, cartão, boleto,
