@@ -592,7 +592,7 @@ function spellScale(tonic, intervals){
 }
 
 /* ============ ESTADO ============ */
-const state = { tonic: TONICS[0], mode: 'maior', selected: 0, rhythm: 'baixoAcorde', progression: null, timbre: 'nylon', distortion: false, drive: 0.55 };
+const state = { tonic: TONICS[0], mode: 'maior', selected: 0, rhythm: 'baixoAcorde', progression: null, timbre: 'nylon', distortion: false, drive: 0.55, user: null, plan: 'free', expiresAt: null, freeUsed: 0 };
 let current = {};
 
 function build(){
@@ -1427,6 +1427,10 @@ function renderDetection(res){
 }
 
 async function analyzeFile(file){
+  if(CONFIG.supabaseUrl && !isPro()){
+    if(state.freeUsed >= 3){ requirePro('Você usou suas 3 análises grátis. Assine o Pro para análises ilimitadas.'); return; }
+    state.freeUsed++;
+  }
   setDetStatus('Decodificando áudio…'); showProgress(0);
   try{
     const buf=await file.arrayBuffer();
@@ -1460,6 +1464,18 @@ function setupDetector(){
   document.getElementById('useKeyBtn').addEventListener('click', useDetectedKey);
 }
 
+/* ===== integração de conta/pagamento (opcional) =====
+   Preencha abaixo para ativar LOGIN REAL (Supabase) e CHECKOUT SEGURO
+   (Mercado Pago via backend). Enquanto estiver vazio, o site usa a conta
+   local de demonstração e os links de pagamento diretos.
+   Passo a passo: veja server/SETUP.md */
+const CONFIG = {
+  backend: '',          // ex.: 'https://triade-api-rkfd.onrender.com'
+  supabaseUrl: '',      // ex.: 'https://xxxxxxxx.supabase.co'
+  supabaseAnonKey: ''   // chave "anon public" do Supabase
+};
+let supa = null;
+
 /* ===== checkout (Mercado Pago) =====
    Links de PAGAMENTO (cobrança única, NÃO renovam automaticamente):
      pro_mensal -> paga 1 mês; pro_anual -> paga 1 ano.
@@ -1470,7 +1486,17 @@ function setupDetector(){
 const CHECKOUT = { pro_mensal:'https://mpago.la/1vHWRFX', pro_anual:'https://mpago.la/1knT8cu', studio:'' };
 let currentCycle = 'mensal';
 
-function goCheckout(plan){
+async function goCheckout(plan){
+  const cycle = plan==='pro' ? currentCycle : 'anual';
+  if(CONFIG.backend && state.user && supa){
+    toast('Abrindo checkout seguro…');
+    try{
+      const r=await fetch(CONFIG.backend.replace(/\/$/,'')+'/checkout',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ plan, cycle, userId:state.user.id, email:state.user.email }) });
+      const d=await r.json();
+      if(d && d.init_point){ window.location.href=d.init_point; return; }
+      throw new Error((d && (d.detail||d.error)) || 'sem init_point');
+    }catch(e){ toast('Falha no checkout: '+e.message); }
+  }
   const key = plan==='pro' ? ('pro_'+currentCycle) : plan;
   const url = CHECKOUT[key];
   if(url){ window.open(url,'_blank'); return; }
@@ -1503,24 +1529,80 @@ function toast(msg){
 }
 function renderAccount(){
   const b=document.getElementById('accountBtn');
-  b.textContent = state.user ? (state.user.name||state.user.email) : 'Entrar';
-  b.title = state.user ? 'Clique para sair' : 'Entrar / criar conta';
+  if(state.user){
+    const tag = CONFIG.supabaseUrl ? ' · '+(isPro()?'PRO':'Free') : '';
+    b.textContent = (state.user.name||state.user.email) + tag;
+    b.title='Clique para sair';
+  } else { b.textContent='Entrar'; b.title='Entrar / criar conta'; }
+}
+function renderAuthModal(){
+  const p=document.querySelector('#authModal .modal p');
+  if(!p) return;
+  p.innerHTML = supa
+    ? 'Entre com seu e-mail — enviaremos um <b>link de acesso</b> (sem senha). Se for a primeira vez, a conta é criada automaticamente.'
+    : 'Guarde suas progressões e desbloqueie os recursos Pro. Conta local de demonstração (sem servidor).';
 }
 function openAuth(){ document.getElementById('authModal').classList.add('open'); setTimeout(()=>document.getElementById('authEmail').focus(),50); }
 function closeAuth(){ document.getElementById('authModal').classList.remove('open'); }
-function doAuth(){
+async function doAuth(){
   const email=document.getElementById('authEmail').value.trim();
   const name=document.getElementById('authName').value.trim();
   const ok=/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
   document.getElementById('authEmail').style.borderColor = ok ? '' : '#f87171';
   if(!ok) return;
+  if(supa){
+    const { error } = await supa.auth.signInWithOtp({ email, options:{ data:{ name }, emailRedirectTo: location.origin + location.pathname } });
+    if(error){ toast('Erro: '+error.message); return; }
+    closeAuth(); toast('Enviamos um link de acesso para '+email);
+    return;
+  }
   state.user={ email, name: name || email.split('@')[0] };
   localStorage.setItem('triade_user', JSON.stringify(state.user));
   closeAuth(); renderAccount();
   if(pendingSave){ pendingSave=false; savePreset(); }
   else { renderSaved(); toast('Bem-vindo(a), '+state.user.name+'!'); }
 }
-function logout(){ state.user=null; localStorage.removeItem('triade_user'); renderAccount(); renderSaved(); toast('Você saiu da conta.'); }
+function logout(){
+  if(supa) supa.auth.signOut();
+  state.user=null; state.plan='free'; localStorage.removeItem('triade_user');
+  renderAccount(); renderSaved(); toast('Você saiu da conta.');
+}
+
+/* ----- plano / permissões ----- */
+function isPro(){
+  if(!CONFIG.supabaseUrl) return true;              // sem Supabase: modo demo (tudo liberado)
+  if(state.plan!=='pro' && state.plan!=='studio') return false;
+  if(state.expiresAt && new Date(state.expiresAt) < new Date()) return false;
+  return true;
+}
+function requirePro(msg){
+  if(isPro()) return true;
+  toast(msg || 'Recurso do plano Pro — assine para liberar.');
+  const el=document.getElementById('planos'); if(el) el.scrollIntoView({behavior:'smooth'});
+  return false;
+}
+async function setUserFromSession(session){
+  state.user={ id: session.user.id, email: session.user.email, name:(session.user.user_metadata && session.user.user_metadata.name)||session.user.email.split('@')[0] };
+  try{
+    const { data } = await supa.from('profiles').select('plan,expires_at').eq('id', session.user.id).maybeSingle();
+    state.plan = (data && data.plan) || 'free';
+    state.expiresAt = data ? data.expires_at : null;
+  }catch(e){ state.plan='free'; state.expiresAt=null; }
+  renderAccount(); renderSaved();
+}
+async function initAuth(){
+  state.user = readUser();
+  if(CONFIG.supabaseUrl && CONFIG.supabaseAnonKey){
+    try{
+      const mod = await import('https://esm.sh/@supabase/supabase-js@2');
+      supa = mod.createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey, { auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:true } });
+      const { data } = await supa.auth.getSession();
+      if(data && data.session) await setUserFromSession(data.session);
+      supa.auth.onAuthStateChange((_e, s)=>{ if(s) setUserFromSession(s); else { state.user=null; state.plan='free'; renderAccount(); renderSaved(); } });
+    }catch(e){ supa=null; }
+  }
+  renderAccount(); renderSaved();
+}
 
 function capturePreset(){
   return {
@@ -1535,6 +1617,7 @@ function capturePreset(){
 let pendingSave = false;
 function savePreset(){
   if(!state.user){ pendingSave = true; openAuth(); return; }
+  if(CONFIG.supabaseUrl && !isPro() && readSaved().length >= 3){ requirePro('No plano Free você salva até 3 progressões. Assine o Pro para salvar sem limite.'); return; }
   const list=readSaved(); list.unshift(capturePreset()); writeSaved(list);
   renderSaved(); toast('Progressão salva!');
 }
@@ -1581,7 +1664,7 @@ function renderSaved(){
     el.querySelector('[data-a="load"]').addEventListener('click',()=>loadPreset(p));
     el.querySelector('[data-a="txt"]').addEventListener('click',()=>exportCifra(p));
     el.querySelector('[data-a="print"]').addEventListener('click',()=>printPreset(p));
-    el.querySelector('[data-a="json"]').addEventListener('click',()=>download((p.tonic+'-'+p.name).replace(/[^\w-]+/g,'_')+'.json', JSON.stringify(p,null,2), 'application/json'));
+    el.querySelector('[data-a="json"]').addEventListener('click',()=>exportJson(p));
     el.querySelector('[data-a="del"]').addEventListener('click',()=>{ const l=readSaved(); l.splice(idx,1); writeSaved(l); renderSaved(); toast('Removida.'); });
     wrap.appendChild(el);
   });
@@ -1604,8 +1687,10 @@ function cifraText(p){
   s+='\nTRÍADE · campo harmônico interativo\n';
   return s;
 }
-function exportCifra(p){ download((p.tonic+'-'+p.name).replace(/[^\w-]+/g,'_')+'.txt', cifraText(p)); }
+function exportCifra(p){ if(!requirePro('Exportar cifra é recurso Pro.')) return; download((p.tonic+'-'+p.name).replace(/[^\w-]+/g,'_')+'.txt', cifraText(p)); }
+function exportJson(p){ if(!requirePro('Exportar é recurso Pro.')) return; download((p.tonic+'-'+p.name).replace(/[^\w-]+/g,'_')+'.json', JSON.stringify(p,null,2), 'application/json'); }
 function printPreset(p){
+  if(!requirePro('Exportar PDF é recurso Pro.')) return;
   const mode=p.mode==='maior'?'Maior':'Menor';
   const w=window.open('','_blank');
   if(!w){ toast('Permita pop-ups para gerar o PDF.'); return; }
@@ -1624,7 +1709,6 @@ function printPreset(p){
   w.document.close(); w.focus(); setTimeout(()=>w.print(),350);
 }
 function setupAccount(){
-  state.user = readUser();
   document.getElementById('accountBtn').addEventListener('click', ()=>{ state.user ? logout() : openAuth(); });
   document.getElementById('authOk').addEventListener('click', doAuth);
   document.getElementById('authCancel').addEventListener('click', closeAuth);
@@ -1632,6 +1716,7 @@ function setupAccount(){
   document.getElementById('authEmail').addEventListener('keydown', e=>{ if(e.key==='Enter') doAuth(); });
   document.getElementById('authName').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('authEmail').focus(); });
   document.getElementById('saveProgBtn').addEventListener('click', savePreset);
+  initAuth();
 }
 
 /* ============ START ============ */
@@ -1642,8 +1727,6 @@ setupDetector();
 setupPlans();
 setupAccount();
 build();
-renderAccount();
-renderSaved();
 </script>
 </body>
 </html>

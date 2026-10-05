@@ -7,14 +7,19 @@ templates de acordes + Viterbi -> tom + progressão -> JSON.
 Este arquivo espelha o algoritmo que roda no navegador (index.html).
 """
 import os
+import json
 import math
+import hmac
 import shutil
+import hashlib
 import tempfile
+import urllib.request
+from datetime import datetime, timedelta
 
 import numpy as np
 import librosa
 import yt_dlp
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -63,6 +68,136 @@ class AnalyzeRequest(BaseModel):
 
 @app.get("/health")
 def health():
+    return {"ok": True}
+
+
+# =====================================================================
+#  Assinatura / pagamento (Mercado Pago) + ativação no Supabase
+#  Configure as variáveis de ambiente (Render > Environment):
+#    MP_ACCESS_TOKEN, MP_WEBHOOK_SECRET, BACKEND_URL, SITE_URL,
+#    SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+# =====================================================================
+
+SITE_URL = os.environ.get("SITE_URL", "https://usetriade.com.br")
+BACKEND_URL = os.environ.get("BACKEND_URL", "").rstrip("/")
+MP_ACCESS_TOKEN = os.environ.get("MP_ACCESS_TOKEN", "")
+MP_WEBHOOK_SECRET = os.environ.get("MP_WEBHOOK_SECRET", "")
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
+SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+
+PLANS = {
+    ("pro", "mensal"):     {"title": "TRÍADE Pro — mensal",     "price": 19.0,  "months": 1},
+    ("pro", "anual"):      {"title": "TRÍADE Pro — anual",      "price": 149.0, "months": 12},
+    ("studio", "mensal"):  {"title": "TRÍADE Studio — mensal",  "price": 49.0,  "months": 1},
+    ("studio", "anual"):   {"title": "TRÍADE Studio — anual",   "price": 499.0, "months": 12},
+}
+
+
+class CheckoutRequest(BaseModel):
+    plan: str
+    cycle: str = "mensal"
+    userId: str | None = None
+    email: str | None = None
+
+
+def _http_json(method, url, headers, body=None):
+    data = json.dumps(body).encode("utf-8") if body is not None else None
+    req = urllib.request.Request(url, data=data, method=method)
+    req.add_header("Content-Type", "application/json")
+    for k, v in headers.items():
+        req.add_header(k, v)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            txt = resp.read().decode("utf-8") or "{}"
+            return json.loads(txt)
+    except urllib.error.HTTPError as exc:  # noqa: F821
+        detail = exc.read().decode("utf-8", "ignore")
+        raise HTTPException(status_code=502, detail=detail or exc.reason)
+
+
+@app.post("/checkout")
+def checkout(req: CheckoutRequest):
+    """Cria uma preferência de pagamento (Checkout Pro) e devolve o init_point."""
+    if not MP_ACCESS_TOKEN:
+        raise HTTPException(status_code=400, detail="Checkout indisponivel (MP_ACCESS_TOKEN nao configurado)")
+    plan = PLANS.get((req.plan, req.cycle))
+    if not plan:
+        raise HTTPException(status_code=400, detail="Plano invalido")
+
+    body = {
+        "items": [{
+            "title": plan["title"],
+            "quantity": 1,
+            "currency_id": "BRL",
+            "unit_price": plan["price"],
+        }],
+        "external_reference": req.userId or "",
+        "metadata": {"plan": req.plan, "cycle": req.cycle, "user_id": req.userId or ""},
+        "back_urls": {"success": SITE_URL, "pending": SITE_URL, "failure": SITE_URL},
+        "auto_return": "approved",
+    }
+    if req.email:
+        body["payer"] = {"email": req.email}
+    if BACKEND_URL:
+        body["notification_url"] = BACKEND_URL + "/webhooks/mercadopago"
+
+    r = _http_json("POST", "https://api.mercadopago.com/checkout/preferences",
+                   {"Authorization": "Bearer " + MP_ACCESS_TOKEN}, body)
+    init = r.get("init_point") or r.get("sandbox_init_point")
+    if not init:
+        raise HTTPException(status_code=502, detail="Mercado Pago nao retornou init_point")
+    return {"init_point": init}
+
+
+def _verify_mp_signature(request: Request, raw: bytes, data_id: str) -> bool:
+    if not MP_WEBHOOK_SECRET:
+        return True
+    sig = request.headers.get("x-signature", "")
+    req_id = request.headers.get("x-request-id", "")
+    ts, v1 = "", ""
+    for part in sig.split(","):
+        if part.startswith("ts="):
+            ts = part[3:]
+        elif part.startswith("v1="):
+            v1 = part[3:]
+    manifest = f"id:{data_id};request-id:{req_id};ts:{ts};"
+    calc = hmac.new(MP_WEBHOOK_SECRET.encode(), manifest.encode(), hashlib.sha256).hexdigest()
+    return hmac.compare_digest(calc, v1)
+
+
+def _activate(user_id, plan, cycle):
+    if not (SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY and user_id):
+        return
+    months = 12 if cycle == "anual" else 1
+    expires = (datetime.utcnow() + timedelta(days=30 * months)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    _http_json("PATCH",
+               f"{SUPABASE_URL}/rest/v1/profiles?id=eq.{user_id}",
+               {"apikey": SUPABASE_SERVICE_ROLE_KEY,
+                "Authorization": "Bearer " + SUPABASE_SERVICE_ROLE_KEY,
+                "Prefer": "return=minimal"},
+               {"plan": plan, "expires_at": expires})
+
+
+@app.post("/webhooks/mercadopago")
+async def mp_webhook(request: Request):
+    raw = await request.body()
+    try:
+        data = json.loads(raw.decode("utf-8") or "{}")
+    except Exception:
+        data = {}
+    topic = data.get("type") or data.get("topic") or request.query_params.get("topic")
+    data_id = str((data.get("data") or {}).get("id") or data.get("id")
+                  or request.query_params.get("data.id") or request.query_params.get("id") or "")
+
+    if not _verify_mp_signature(request, raw, data_id):
+        raise HTTPException(status_code=401, detail="assinatura invalida")
+
+    if topic in ("payment", "merchant_order") and data_id:
+        pay = _http_json("GET", f"https://api.mercadopago.com/v1/payments/{data_id}",
+                         {"Authorization": "Bearer " + MP_ACCESS_TOKEN})
+        if pay.get("status") == "approved":
+            meta = pay.get("metadata") or {}
+            _activate(pay.get("external_reference"), meta.get("plan", "pro"), meta.get("cycle", "anual"))
     return {"ok": True}
 
 
