@@ -6,7 +6,10 @@
 ---
 
 ## 0. Decisões tomadas
-- **Domínio:** `usetriade.com.br` (registro no Registro.br).
+- **Domínio:** `usetriade.com.br` — **DNS já configurado** no hPanel da Hostinger
+  (A → IPs do GitHub Pages; `www` → CNAME `leon-roza.github.io`). Site no ar em
+  `http://usetriade.com.br`; **HTTPS aguardando emissão do certificado** pelo
+  GitHub (ativar "Enforce HTTPS" assim que estiver pronto).
 - **Pagamento:** **Mercado Pago** (Link de Pagamento / Assinatura).
 - **Conta de usuário:** **local/demo** por enquanto (localStorage); migrar para
   Supabase quando precisar de login real e progressões na nuvem.
