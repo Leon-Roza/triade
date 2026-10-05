@@ -141,7 +141,8 @@ def checkout(req: CheckoutRequest):
 
     r = _http_json("POST", "https://api.mercadopago.com/checkout/preferences",
                    {"Authorization": "Bearer " + MP_ACCESS_TOKEN}, body)
-    init = r.get("init_point") or r.get("sandbox_init_point")
+    sandbox = os.environ.get("MP_SANDBOX", "").strip().lower() in ("1", "true", "yes", "on")
+    init = (r.get("sandbox_init_point") or r.get("init_point")) if sandbox else (r.get("init_point") or r.get("sandbox_init_point"))
     if not init:
         raise HTTPException(status_code=502, detail="Mercado Pago nao retornou init_point")
     return {"init_point": init}
