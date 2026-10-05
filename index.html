@@ -510,7 +510,7 @@
       <audio id="detAudio" controls style="display:none"></audio>
       <div class="det-actions">
         <button class="btn primary" id="useKeyBtn">✓ Usar esta tonalidade no site</button>
-        <button class="btn" id="saveCifraBtn">💾 Salvar cifra</button>
+        <button class="btn" id="playCifraBtn">▶ Tocar cifra</button>
         <button class="btn" id="detTabBtn">⬇ Tab</button>
         <button class="btn" id="detMidiBtn">⬇ MIDI</button>
       </div>
@@ -1519,25 +1519,40 @@ function chordNotesOf(rootPc, quality){
   const ivs = quality==='min'?[0,3,7] : quality==='dim'?[0,3,6] : quality==='aug'?[0,4,8] : [0,4,7];
   return ivs.map(iv=>SHARP_NAMES[(rootPc+iv)%12]);
 }
-function saveDetected(){
-  if(!lastDetection){ toast('Nenhuma cifra detectada ainda.'); return; }
-  if(!state.user){ pendingAction = saveDetected; openAuth(); return; }
-  if(CONFIG.supabaseUrl && !isPro() && readSaved().length >= 3){ requirePro('No plano Free você salva até 3. Assine o Pro para salvar sem limite.'); return; }
-  const res=lastDetection;
-  const chords=res.segments.filter(s=>s.quality!=='N').map(s=>({ name:segName(s), degree:'', notes:chordNotesOf(s.root,s.quality), start:s.start, end:s.end }));
-  if(!chords.length){ toast('Nada para salvar — nenhum acorde identificado.'); return; }
-  const list=readSaved();
-  list.unshift({ kind:'cifra', name:'Cifra do áudio', tonic:ROOT_LABELS[res.key.root], mode:res.key.mode,
-                 chords, rhythm:state.rhythm, bpm:player.bpm, timbre:state.timbre, distortion:state.distortion, when:Date.now() });
-  writeSaved(list); renderSaved(); toast('Cifra salva! Toque em “▶ Tocar” nas suas cifras.');
-}
-
 function setupDetector(){
+  const audioEl=document.getElementById('detAudio');
   document.getElementById('audioFile').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) analyzeFile(f); });
   document.getElementById('useKeyBtn').addEventListener('click', useDetectedKey);
-  document.getElementById('saveCifraBtn').addEventListener('click', saveDetected);
+  document.getElementById('playCifraBtn').addEventListener('click', playDetCifra);
   document.getElementById('detTabBtn').addEventListener('click', exportDetTab);
   document.getElementById('detMidiBtn').addEventListener('click', exportDetMidi);
+  if(audioEl) audioEl.addEventListener('ended', ()=>{ try{ stopDetCifra(); }catch(e){} });
+}
+
+/* ----- Tocar a cifra junto com o áudio enviado ----- */
+let detChordTimers=[];
+function stopDetCifra(){
+  detChordTimers.forEach(clearTimeout); detChordTimers=[];
+  const a=document.getElementById('detAudio'); try{ a.pause(); }catch(e){}
+  const b=document.getElementById('playCifraBtn'); if(b) b.textContent='▶ Tocar cifra';
+}
+function playDetCifra(){
+  if(!lastDetection){ toast('Analise um áudio primeiro.'); return; }
+  const a=document.getElementById('detAudio');
+  const wasPlaying = detChordTimers.length>0;
+  stopDetCifra();
+  if(wasPlaying) return;
+  try{ ensureCtx(); }catch(e){}
+  try{ a.currentTime=0; a.play().catch(()=>{}); }catch(e){}
+  const segs=lastDetection.segments.filter(s=>s.quality!=='N');
+  segs.forEach(s=>{
+    detChordTimers.push(setTimeout(()=>{
+      try{ playChordAt({notes:chordNotesOf(s.root,s.quality)}, audioCtx.currentTime+0.02, Math.max(0.4,(s.end-s.start)*0.95)); }catch(e){}
+    }, Math.max(0, s.start*1000)));
+  });
+  const total=(lastDetection.duration || (lastDetection.segments.length?lastDetection.segments[lastDetection.segments.length-1].end:0));
+  detChordTimers.push(setTimeout(stopDetCifra, total*1000 + 300));
+  const b=document.getElementById('playCifraBtn'); if(b) b.textContent='■ Parar';
 }
 
 /* ============ MODO COMPOSITOR ============ */
