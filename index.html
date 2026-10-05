@@ -1516,7 +1516,9 @@ function doAuth(){
   if(!ok) return;
   state.user={ email, name: name || email.split('@')[0] };
   localStorage.setItem('triade_user', JSON.stringify(state.user));
-  closeAuth(); renderAccount(); renderSaved(); toast('Bem-vindo(a), '+state.user.name+'!');
+  closeAuth(); renderAccount();
+  if(pendingSave){ pendingSave=false; savePreset(); }
+  else { renderSaved(); toast('Bem-vindo(a), '+state.user.name+'!'); }
 }
 function logout(){ state.user=null; localStorage.removeItem('triade_user'); renderAccount(); renderSaved(); toast('Você saiu da conta.'); }
 
@@ -1530,8 +1532,9 @@ function capturePreset(){
     when: Date.now()
   };
 }
+let pendingSave = false;
 function savePreset(){
-  if(!state.user){ openAuth(); return; }
+  if(!state.user){ pendingSave = true; openAuth(); return; }
   const list=readSaved(); list.unshift(capturePreset()); writeSaved(list);
   renderSaved(); toast('Progressão salva!');
 }
