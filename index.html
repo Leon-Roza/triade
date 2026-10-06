@@ -2065,6 +2065,7 @@ function renderStaff(hostId, events){
 function centerScore(hostId, i){
   const host=document.getElementById(hostId); if(!host) return;
   const xs=SCORE_XS[hostId]; if(!xs || !xs.length) return;
+  if(typeof i!=='number' || isNaN(i)) return;
   const svg=host.querySelector('.score-svg'); if(!svg) return;
   const idx=Math.max(0,Math.min(xs.length-1,i));
   const W=host.clientWidth||600;
@@ -2076,7 +2077,7 @@ function melodyEvents(){
   const evs=[];
   m.chords.forEach((c,bar)=>{
     const notes=m.notes.filter(n=>n.bar===bar && !n.rest).sort((a,b)=>a.beat-b.beat);
-    notes.forEach((n,i)=>{ const next=notes[i+1]; let db=next?(next.beat-n.beat):(m.beats-n.beat); if(!(db>0)) db=1; evs.push({notes:[{midi:n.midi}], durBeats:db, chord:(i===0?c.name:''), barStart:(i===0)}); });
+    notes.forEach((n,i)=>{ const next=notes[i+1]; let db=next?(next.beat-n.beat):(m.beats-n.beat); if(!(db>0)) db=1; n.tabIndex=evs.length; evs.push({notes:[{midi:n.midi}], durBeats:db, chord:(i===0?c.name:''), barStart:(i===0)}); });
   });
   return evs;
 }
