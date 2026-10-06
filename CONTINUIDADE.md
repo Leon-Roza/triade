@@ -167,8 +167,9 @@ com banda de acompanhamento, com features inspiradas no **Band-in-a-Box**.
 - Letras de seção (A/B/C/I/F) marcadas na tablatura.
 
 **Banda, groove e mix**
-- Instrumentos: **melodia** (guitarra Karplus-Strong), **pad/teclado** (synth), **baixo** (samples CC0
-  dsmolken pizzicato), **bateria** (samples CC0 Virtuosity Drums, com camadas de intensidade).
+- Instrumentos: **melodia** (guitarra Karplus-Strong), **pad/teclado** (synth **ou piano amostrado CC0**),
+  **baixo** (samples CC0 dsmolken pizzicato), **bateria** (samples CC0 Virtuosity Drums, com camadas).
+- **Editor de forma**: sequência de seções editável (A/B/C/D/Intro/Final) + **casas 1ª/2ª** (fim alternativo).
 - **Mixer**: volume por trilha + **Pan** por trilha + **Reverb** (bus com convolução).
 - **Humanizar** (variação de tempo/intensidade), **Swing**, **Contagem** (count-in).
 - **Andamento** (Largo→Presto + slider), **Compasso** (4/4, 3/4, 2/4), **Loop**.
@@ -182,6 +183,7 @@ com banda de acompanhamento, com features inspiradas no **Band-in-a-Box**.
 **Samples (CC0)** — ver `samples/CREDITS.md`:
 - `samples/drums/*.wav` — Virtuosity Drums (bumbo, caixa, chimbais, pratos, tons) em camadas.
 - `samples/bass/*.wav` — dsmolken double-bass pizzicato (11 notas, mapeadas por afinação).
+- `samples/piano/*.wav` — VCSL Grand Piano Kawai (36 notas, mapeadas por afinação).
 
-**Próximos possíveis (ainda não feitos):** editor visual da forma com casas 1ª/2ª, estilo/banda nomeados,
-mais RealTracks (piano, cordas, etc.), notação em partitura além da tablatura.
+**Próximos possíveis (ainda não feitos):** mais RealTracks (cordas/cello amostrados), notação em partitura
+além da tablatura, e estilos de banda nomeados.

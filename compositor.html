@@ -173,6 +173,11 @@
       </div>
     </div>
     <div class="ctl"><label>Repetições (chorus)</label><div class="row" id="chorusBtns"></div></div>
+    <div class="ctl"><label>Editor de forma (seções / casas)</label>
+      <div class="row" id="seqChips" style="margin-bottom:8px"></div>
+      <div class="row" id="seqAdd"></div>
+    </div>
+    <div class="ctl"><label>Pad / Teclado</label><div class="row" id="padBtns"></div></div>
     <div class="row" style="margin:10px 0 4px">
       <label class="check"><input type="checkbox" id="humanChk" /> Humanizar</label>
       <label class="check"><input type="checkbox" id="swingChk" /> Swing</label>
@@ -391,6 +396,23 @@ function playBassNote(midi,t,dur,vel,bus){
     if(buf){ const src=audioCtx.createBufferSource(); src.buffer=buf; src.playbackRate.value=Math.pow(2,(midi-best)/12); const g=audioCtx.createGain(); g.gain.value=Math.max(0,Math.min(1.2,vel)); src.connect(g).connect(bus||outputNode()); try{ src.start(t); }catch(e){} return true; } }
   synthBass(midi,t,dur,vel,bus); return false;
 }
+const PIANO_MIDIS=[10,12,15,18,21,24,27,30,33,36,38,40,42,44,46,48,50,52,54,56,58,60,62,64,66,68,70,72,75,78,81,84,87,91,93,96];
+let pianoReady=false, pianoLoading=false; const pianoBufs={};
+async function loadPiano(){
+  if(pianoReady||pianoLoading||!audioCtx) return; pianoLoading=true;
+  try{ await Promise.all(PIANO_MIDIS.map(async m=>{ const r=await fetch('samples/piano/piano_'+m+'.wav'); const ab=await r.arrayBuffer(); pianoBufs[m]=await audioCtx.decodeAudioData(ab); })); pianoReady=true; }
+  catch(e){ pianoReady=false; pianoLoading=false; }
+}
+function playPianoNote(midi,t,dur,vel,bus){
+  if(!pianoReady) return false;
+  let best=PIANO_MIDIS[0], bd=Math.abs(PIANO_MIDIS[0]-midi); PIANO_MIDIS.forEach(m=>{ const d=Math.abs(m-midi); if(d<bd){ bd=d; best=m; } });
+  const buf=pianoBufs[best]; if(!buf) return false;
+  const src=audioCtx.createBufferSource(); src.buffer=buf; src.playbackRate.value=Math.pow(2,(midi-best)/12);
+  const g=audioCtx.createGain(); const rel=Math.min(0.6,dur*0.5);
+  g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(vel,t+0.005); g.gain.setValueAtTime(vel,t+Math.max(0.01,dur-0.1)); g.gain.linearRampToValueAtTime(0.0001,t+dur+rel);
+  src.connect(g).connect(bus||outputNode()); try{ src.start(t); }catch(e){} return true;
+}
+function padVoice(midis,t,dur,vel,bus){ if(state.padInst==='piano' && pianoReady){ midis.forEach(m=>playPianoNote(m,t,dur,vel,bus)); return; } synthPad(midis,t,dur,vel,bus); }
 function playChord(midiArr,t,dur,vel,bus){ midiArr.forEach((m,i)=>pluckVoice(m,t+i*0.006,Math.min(dur,2.2),vel,undefined,undefined,bus)); }
 function playBass(midi,t,dur,vel){ pluckVoice(midi,t,Math.min(dur,2.2),vel); }
 
@@ -444,7 +466,7 @@ const REGISTERS={grave:{n:'Grave',oct:3},media:{n:'Média',oct:4},aguda:{n:'Agud
 const STYLES={cantavel:{n:'Cantável',leap:0.12},arpejado:{n:'Arpejado',leap:0.10,arp:true},saltos:{n:'Saltos',leap:0.55},pentatonica:{n:'Pentatônica',leap:0.2,min:true}};
 
 /* ================= ESTADO ================= */
-const state={ tonic:TONICS[0], scale:'maior', isMode:false, density:'media', register:'grave', style:'cantavel', form:'ternaria', tech:{pm:true,bend:true,slide:true,hp:true,vib:false,harm:false}, timbre:'nylon', rhythm:'baixoAcorde', drums:'rock', drumVol:0.75, mix:{melody:0.85,pad:0.45,bass:0.7}, pan:{melody:0,pad:0,bass:0,drums:0}, rev:0.18, humanize:false, swing:false, countIn:false, harmony:'off', ext:'triade', intro:false, ending:false, push:false, accents:false, reharm:false, chorus:1, distortion:false, drive:0.55, bpm:90, beats:4, loop:true, melody:null };
+const state={ tonic:TONICS[0], scale:'maior', isMode:false, density:'media', register:'grave', style:'cantavel', form:'ternaria', tech:{pm:true,bend:true,slide:true,hp:true,vib:false,harm:false}, timbre:'nylon', rhythm:'baixoAcorde', drums:'rock', drumVol:0.75, mix:{melody:0.85,pad:0.45,bass:0.7}, pan:{melody:0,pad:0,bass:0,drums:0}, rev:0.18, humanize:false, swing:false, countIn:false, harmony:'off', ext:'triade', padInst:'synth', intro:false, ending:false, push:false, accents:false, reharm:false, chorus:1, formSeq:null, distortion:false, drive:0.55, bpm:90, beats:4, loop:true, melody:null };
 
 /* ================= ESCALA / ACORDES ================= */
 function currentIntervals(){ return state.isMode?MODES[state.scale].intervals:SCALES[state.scale].intervals; }
@@ -480,7 +502,7 @@ function rel(a,b){ return ((b-a)%12+12)%12; }
 const REHARM={0:5,1:3,4:2};
 function sectionChords(letter){
   const pcs=buildScale().map(x=>x.pitch), n=pcs.length;
-  const pat=({A:[0,4],B:[5,3],C:[1,4],D:[0,5],I:[0,4],F:[4,0]})[letter]||[0,4];
+  const pat=({A:[0,4],B:[5,3],C:[1,4],D:[0,5],I:[0,4],F:[4,0],'1':[4],'2':[0]})[letter]||[0,4];
   const sev = state.ext==='setima' && n>=7;
   return pat.map(d=>{
     let dd=d%n;
@@ -496,7 +518,7 @@ function sectionChords(letter){
 function genSection(letter,varIdx){
   const style=STYLES[state.style]; let pool=buildScale().map(x=>x.pitch);
   if(style.min){ const keep=[0,1,2,4,5]; pool=keep.map(i=>pool[i%pool.length]); }
-  const regOff=({A:0,B:1,D:1,C:-1,I:0,F:0}[letter]||0)+(varIdx?(varIdx%2):0);
+  const regOff=({A:0,B:1,D:1,C:-1,I:0,F:0,'1':0,'2':0}[letter]||0)+(varIdx?(varIdx%2):0);
   const baseOct=(REGISTERS[state.register]||REGISTERS.media).oct+regOff;
   const midis=[]; for(let o=baseOct;o<=baseOct+1;o++) pool.forEach(pc=>midis.push((o+1)*12+pc)); midis.sort((a,b)=>a-b);
   const chords=sectionChords(letter), onsets=onsetsFor(state.beats,state.rhythm,state.density);
@@ -516,9 +538,9 @@ function genSection(letter,varIdx){
   return {letter,chords,notes,bars:chords.length};
 }
 function generateMelody(){
-  const form=FORMS[state.form]||FORMS.ternaria; let seq=(form.sections||['A']).slice();
-  if(state.intro) seq=['I'].concat(seq);
-  if(state.ending) seq=seq.concat(['F']);
+  const form=FORMS[state.form]||FORMS.ternaria; let seq=currentSeq().slice();
+  if(state.intro && seq[0]!=='I') seq=['I'].concat(seq);
+  if(state.ending && seq[seq.length-1]!=='F') seq=seq.concat(['F']);
   const cache={}, seen={}, chords=[], notes=[], marks=[]; let barOff=0;
   seq.forEach(letter=>{
     const count=seen[letter]||0, isVar=form.vary&&count>0;
@@ -623,7 +645,7 @@ function tstep(bar,s,barMs,stepMs,opt){ let ms=bar*barMs+s*stepMs; if(opt.swing&
 function hvel(v,opt){ return opt.humV? Math.max(0.05, v+(Math.random()*2-1)*0.08) : v; }
 let melodyPasses=0;
 function playMelody(solo){
-  stopAll(); try{ ensureCtx(); }catch(e){ return; } loadDrums(); loadBass();
+  stopAll(); try{ ensureCtx(); }catch(e){ return; } loadDrums(); loadBass(); loadPiano();
   const m=state.melody; if(!m) return;
   const bpm=state.bpm, beatMs=60000/bpm, barMs=beatMs*m.beats, stepMs=beatMs/2;
   const acc=!solo && document.getElementById('accChk') && document.getElementById('accChk').checked;
@@ -650,7 +672,7 @@ function playMelody(solo){
     const accent = state.accents ? ['normal','hold','normal','shot','normal','rest'][bar%6] : 'normal';
     const p0 = bar*barMs - push;
     if(c && accent!=='rest'){
-      if(padOn){ const padM=c.notes.map(nm=>48+pcOf(nm)); const dur=(accent==='hold'? barMs/1000*1.6 : barMs/1000*0.98); timers.push(setTimeout(()=>synthPad(padM,audioCtx.currentTime+0.01,dur,0.05*state.mix.pad,B('pad')), p0 + opt.off)); }
+      if(padOn){ const padM=c.notes.map(nm=>48+pcOf(nm)); const dur=(accent==='hold'? barMs/1000*1.6 : barMs/1000*0.98); timers.push(setTimeout(()=>padVoice(padM,audioCtx.currentTime+0.01,dur,0.05*state.mix.pad,B('pad')), p0 + opt.off)); }
       const midis=c.notes.map(nm=>48+pcOf(nm));
       if(acc && accent==='normal'){ const pat=(RHYTHMS[m.rhythm]||RHYTHMS.acordes).gen(m.beats);
         pat.forEach((ev,s)=>{ if(!ev||ev.t==='bass') return; const t=tstep(bar,s,barMs,stepMs,opt)-(s===0?push:0), dur=ev.len*stepMs;
@@ -722,6 +744,14 @@ function drumRow(){
 }
 function extRow(){ const host=document.getElementById('extBtns'); if(!host) return; host.innerHTML=''; [['triade','Tríades'],['setima','Sétimas (7)']].forEach(([k,l])=>{ const b=document.createElement('button'); b.className='opt'+(state.ext===k?' active':''); b.textContent=l; b.addEventListener('click',()=>{ state.ext=k; extRow(); if(state.melody) generateMelody(); }); host.appendChild(b); }); }
 function harmRow(){ const host=document.getElementById('harmBtns'); if(!host) return; host.innerHTML=''; [['off','Desligada'],['3a+','3ª acima'],['3a-','3ª abaixo'],['6a+','6ª acima'],['6a-','6ª abaixo'],['8a+','8ª acima']].forEach(([k,l])=>{ const b=document.createElement('button'); b.className='opt'+(state.harmony===k?' active':''); b.textContent=l; b.addEventListener('click',()=>{ state.harmony=k; harmRow(); }); host.appendChild(b); }); }
+function currentSeq(){ return (state.formSeq && state.formSeq.length)? state.formSeq.slice() : ((FORMS[state.form]||FORMS.ternaria).sections||['A']).slice(); }
+function renderFormEditor(){
+  const chips=document.getElementById('seqChips');
+  if(chips){ chips.innerHTML=''; currentSeq().forEach(function(L,i){ const b=document.createElement('button'); b.className='opt active'; b.textContent=L; b.title='clique para remover'; b.addEventListener('click',function(){ state.formSeq=currentSeq(); state.formSeq.splice(i,1); if(!state.formSeq.length) state.formSeq=null; renderFormEditor(); if(state.melody) generateMelody(); }); chips.appendChild(b); }); }
+  const add=document.getElementById('seqAdd');
+  if(add){ add.innerHTML=''; [['A','A'],['B','B'],['C','C'],['D','D'],['I','Intro'],['F','Final'],['1','1ª casa'],['2','2ª casa']].forEach(function(it){ const b=document.createElement('button'); b.className='opt'; b.textContent='+ '+it[1]; b.addEventListener('click',function(){ state.formSeq=currentSeq(); state.formSeq.push(it[0]); renderFormEditor(); if(state.melody) generateMelody(); }); add.appendChild(b); }); const cl=document.createElement('button'); cl.className='opt'; cl.textContent='Limpar'; cl.addEventListener('click',function(){ state.formSeq=null; renderFormEditor(); if(state.melody) generateMelody(); }); add.appendChild(cl); }
+}
+function padRow(){ const host=document.getElementById('padBtns'); if(!host) return; host.innerHTML=''; [['synth','Synth'],['piano','Piano (samples)']].forEach(function(it){ const b=document.createElement('button'); b.className='opt'+(state.padInst===it[0]?' active':''); b.textContent=it[1]; b.addEventListener('click',function(){ state.padInst=it[0]; padRow(); }); host.appendChild(b); }); }
 function setupControls(){
   btnRow('noteBtns', TONICS.map(t=>({key:t.label,label:t.label})), k=>k===state.tonic.label, k=>{ state.tonic=TONICS.find(t=>t.label===k); if(state.melody) generateMelody(); });
   btnRow('scaleBtns', Object.entries(SCALES).map(([k,v])=>({key:k,label:v.name})), k=>!state.isMode&&k===state.scale, k=>{ state.scale=k; state.isMode=false; if(state.melody) generateMelody(); });
@@ -751,6 +781,7 @@ function setupControls(){
   const bChk=(id,key)=>{ const el=document.getElementById(id); if(!el) return; el.checked=!!state[key]; el.addEventListener('change',()=>{ state[key]=el.checked; if(state.melody) generateMelody(); }); };
   bChk('introChk','intro'); bChk('endChk','ending'); bChk('pushChk','push'); bChk('accentChk','accents'); bChk('reharmChk','reharm');
   btnRow('chorusBtns', [1,2,3,4].map(n=>({key:''+n,label:n+'x'})), k=>(''+state.chorus)===k, k=>{ state.chorus=+k; });
+  renderFormEditor(); padRow();
   btnRow('formBtns', Object.entries(FORMS).map(([k,v])=>({key:k,label:v.name})), k=>k===state.form, k=>{ state.form=k; if(state.melody) generateMelody(); });
   document.getElementById('meter').addEventListener('change',e=>{ state.beats=+e.target.value; if(state.melody) generateMelody(); });
   document.getElementById('distChk').addEventListener('change',e=>{ state.distortion=e.target.checked; });
