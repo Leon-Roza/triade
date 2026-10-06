@@ -128,9 +128,14 @@
         <label>Ritmo (acompanhamento)</label>
         <div class="row" id="rhythmBtns"></div>
       </div>
+      <div class="ctl">
+        <label>Bateria</label>
+        <div class="row" id="drumBtns"></div>
+      </div>
     </div>
     <div class="grid2">
       <div class="tempo-row"><label>Andamento</label><input type="range" id="tempo" min="45" max="200" value="90" /><span class="tempo-val" id="tempoVal">90 BPM</span></div>
+      <div class="tempo-row"><label>Bateria (vol)</label><input type="range" id="drumVol" min="0" max="100" value="75" /><span class="tempo-val" id="drumVolVal">75%</span></div>
       <div class="tempo-row"><label>Compasso</label><select id="meter" style="font-family:var(--font);background:#0e0e1a;color:var(--txt);border:1px solid var(--stroke);border-radius:10px;padding:8px 10px"><option value="4">4/4</option><option value="3">3/4</option><option value="2">2/4</option></select>
         <label class="check"><input type="checkbox" id="accChk" checked /> acompanhamento</label>
         <label class="check"><input type="checkbox" id="distChk" /> distorção</label>
@@ -265,6 +270,40 @@ function pluckVoice(midi,time,dur,vel,tech,prevMidi){
   outputChain(nodes);
   src.start(time); src.stop(time+Math.min(src.buffer.duration,d+0.06));
 }
+let noiseBuf=null;
+function getNoise(){ if(noiseBuf) return noiseBuf; const sr=audioCtx.sampleRate, len=Math.floor(sr*2); noiseBuf=audioCtx.createBuffer(1,len,sr); const d=noiseBuf.getChannelData(0); for(let i=0;i<len;i++) d[i]=Math.random()*2-1; return noiseBuf; }
+function drumKick(t,v){
+  const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+  o.type='sine'; o.frequency.setValueAtTime(155,t); o.frequency.exponentialRampToValueAtTime(46,t+0.11);
+  g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(v,t+0.003); g.gain.exponentialRampToValueAtTime(0.0001,t+0.34);
+  o.connect(g).connect(outputNode()); o.start(t); o.stop(t+0.4);
+  const n=audioCtx.createBufferSource(); n.buffer=getNoise(); const hp=audioCtx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=1200; const ng=audioCtx.createGain(); ng.gain.setValueAtTime(v*0.5,t); ng.gain.exponentialRampToValueAtTime(0.0001,t+0.03); n.connect(hp).connect(ng).connect(outputNode()); n.start(t); n.stop(t+0.05);
+}
+function drumSnare(t,v){
+  const n=audioCtx.createBufferSource(); n.buffer=getNoise();
+  const hp=audioCtx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=1400;
+  const bp=audioCtx.createBiquadFilter(); bp.type='peaking'; bp.frequency.value=3200; bp.gain.value=5; bp.Q.value=0.8;
+  const g=audioCtx.createGain(); g.gain.setValueAtTime(v,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.2);
+  n.connect(hp).connect(bp).connect(g).connect(outputNode()); n.start(t); n.stop(t+0.25);
+  const o=audioCtx.createOscillator(), og=audioCtx.createGain(); o.type='triangle'; o.frequency.value=188;
+  og.gain.setValueAtTime(v*0.5,t); og.gain.exponentialRampToValueAtTime(0.0001,t+0.12); o.connect(og).connect(outputNode()); o.start(t); o.stop(t+0.15);
+}
+function drumHat(t,v,open){
+  const n=audioCtx.createBufferSource(); n.buffer=getNoise();
+  const hp=audioCtx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=8200;
+  const g=audioCtx.createGain(); const dec=open?0.32:0.045;
+  g.gain.setValueAtTime(v*0.55,t); g.gain.exponentialRampToValueAtTime(0.0001,t+dec);
+  n.connect(hp).connect(g).connect(outputNode()); n.start(t); n.stop(t+dec+0.05);
+}
+function scheduleDrums(bar,barMs,stepMs){
+  if(state.drums==='off') return; const pat=DRUMS[state.drums]; if(!pat) return; const grid=state.beats*2, dv=state.drumVol;
+  for(let s=0;s<grid;s++){
+    const t=bar*barMs+s*stepMs;
+    if((pat.kick||[]).includes(s)) timers.push(setTimeout(()=>drumKick(audioCtx.currentTime+0.01,0.95*dv),t));
+    if((pat.snare||[]).includes(s)) timers.push(setTimeout(()=>drumSnare(audioCtx.currentTime+0.01,0.72*dv),t));
+    if((pat.hat||[]).includes(s)){ const open=(s%2===1); timers.push(setTimeout(()=>drumHat(audioCtx.currentTime+0.01,(s%2===0?0.5:0.34)*dv,open),t)); }
+  }
+}
 function playChord(midiArr,t,dur,vel){ midiArr.forEach((m,i)=>pluckVoice(m,t+i*0.006,Math.min(dur,2.2),vel)); }
 function playBass(midi,t,dur,vel){ pluckVoice(midi,t,Math.min(dur,2.2),vel); }
 
@@ -303,12 +342,22 @@ const FORMS={
   sonata:{name:'Sonata (Exp-Dev-Reexp)',sections:['A','B','A']},
   sinfonia:{name:'Sinfonia / Suíte',sections:['A','B','C','D']}
 };
+const DRUMS={
+  off:{name:'Desligada'},
+  rock:{name:'Rock',kick:[0,4],snare:[2,6],hat:[0,1,2,3,4,5,6,7]},
+  pop:{name:'Pop',kick:[0,4],snare:[2,6],hat:[0,2,4,6]},
+  balada:{name:'Balada',kick:[0],snare:[2,6],hat:[0,2,4,6]},
+  valsa:{name:'Valsa',kick:[0],snare:[2,4],hat:[0,2,4]},
+  bossa:{name:'Bossa',kick:[0,3],snare:[2,6],hat:[1,3,5,7]},
+  samba:{name:'Samba',kick:[0,3,4],snare:[2,5,6],hat:[1,2,3,5,6,7]},
+  simples:{name:'Simples',kick:[0,4],snare:[2,6],hat:[0,2,4,6]}
+};
 const DENSITIES={simples:'Simples',media:'Média',rapida:'Rápida'};
 const REGISTERS={grave:{n:'Grave',oct:3},media:{n:'Média',oct:4},aguda:{n:'Aguda',oct:5}};
 const STYLES={cantavel:{n:'Cantável',leap:0.12},arpejado:{n:'Arpejado',leap:0.10,arp:true},saltos:{n:'Saltos',leap:0.55},pentatonica:{n:'Pentatônica',leap:0.2,min:true}};
 
 /* ================= ESTADO ================= */
-const state={ tonic:TONICS[0], scale:'maior', isMode:false, density:'media', register:'grave', style:'cantavel', form:'ternaria', tech:{pm:true,bend:true,slide:true,hp:true,vib:false,harm:false}, timbre:'nylon', rhythm:'baixoAcorde', distortion:false, drive:0.55, bpm:90, beats:4, loop:true, melody:null };
+const state={ tonic:TONICS[0], scale:'maior', isMode:false, density:'media', register:'grave', style:'cantavel', form:'ternaria', tech:{pm:true,bend:true,slide:true,hp:true,vib:false,harm:false}, timbre:'nylon', rhythm:'baixoAcorde', drums:'rock', drumVol:0.75, distortion:false, drive:0.55, bpm:90, beats:4, loop:true, melody:null };
 
 /* ================= ESCALA / ACORDES ================= */
 function currentIntervals(){ return state.isMode?MODES[state.scale].intervals:SCALES[state.scale].intervals; }
@@ -487,6 +536,7 @@ function playMelody(solo){
         else if(ev.t==='arp') timers.push(setTimeout(()=>pluckVoice(midis[ev.i],audioCtx.currentTime+0.01,Math.min(dur/1000,1.2),0.11*base),t));
       });
     }
+    scheduleDrums(bar,barMs,stepMs);
   }
   schedNotes(m.notes,1);
   if(m.imitation) schedNotes(m.imitation,0.6);
@@ -520,7 +570,9 @@ function midiFile(m){
     c.notes.forEach(nm=>{ const mid=48+pcOf(nm); acc.push({tick:bar*barT,prio:1,data:[0x91,mid,64]}); acc.push({tick:(bar+1)*barT,prio:0,data:[0x81,mid,0]}); });
   });
   const total=m.chords.length*barT;
-  return new Uint8Array([...midiChunk('MThd',[0,1,0,3,(TPQ>>8)&0xff,TPQ&0xff]),...midiChunk('MTrk',midiTrack(t0,0)),...midiChunk('MTrk',midiTrack(mel,total)),...midiChunk('MTrk',midiTrack(acc,total))]);
+  const dr=[]; const grid=beats*2; const pat=DRUMS[state.drums];
+  if(pat && state.drums!=='off'){ for(let bar=0;bar<m.chords.length;bar++){ const add=(s,note,vel)=>{ const tick=bar*barT+s*(TPQ/2); dr.push({tick,prio:1,data:[0x99,note,Math.round(vel)]}); dr.push({tick:tick+30,prio:0,data:[0x89,note,0]}); }; (pat.kick||[]).forEach(s=>{ if(s<grid) add(s,36,110); }); (pat.snare||[]).forEach(s=>{ if(s<grid) add(s,38,100); }); (pat.hat||[]).forEach(s=>{ if(s<grid) add(s,(s%2===1?46:42),(s%2===0?80:60)); }); } }
+  return new Uint8Array([...midiChunk('MThd',[0,1,0,4,(TPQ>>8)&0xff,TPQ&0xff]),...midiChunk('MTrk',midiTrack(t0,0)),...midiChunk('MTrk',midiTrack(mel,total)),...midiChunk('MTrk',midiTrack(acc,total)),...midiChunk('MTrk',midiTrack(dr,total))]);
 }
 
 /* ================= CONTROLES ================= */
@@ -536,6 +588,10 @@ function tempoRow(){
   const host=document.getElementById('tempoBtns'); if(!host) return; host.innerHTML='';
   TEMPOS.forEach(t=>{ const b=document.createElement('button'); b.className='opt'+(state.bpm===t.bpm?' active':''); b.textContent=t.name; b.title=t.bpm+' BPM — '+t.desc; b.addEventListener('click',()=>{ state.bpm=t.bpm; const s=document.getElementById('tempo'); if(s) s.value=t.bpm; const v=document.getElementById('tempoVal'); if(v) v.textContent=t.bpm+' BPM'; tempoRow(); if(state.melody) generateMelody(); }); host.appendChild(b); });
 }
+function drumRow(){
+  const host=document.getElementById('drumBtns'); if(!host) return; host.innerHTML='';
+  Object.entries(DRUMS).forEach(([k,v])=>{ const b=document.createElement('button'); b.className='opt'+(state.drums===k?' active':''); b.textContent=v.name; b.addEventListener('click',()=>{ state.drums=k; drumRow(); }); host.appendChild(b); });
+}
 function setupControls(){
   btnRow('noteBtns', TONICS.map(t=>({key:t.label,label:t.label})), k=>k===state.tonic.label, k=>{ state.tonic=TONICS.find(t=>t.label===k); if(state.melody) generateMelody(); });
   btnRow('scaleBtns', Object.entries(SCALES).map(([k,v])=>({key:k,label:v.name})), k=>!state.isMode&&k===state.scale, k=>{ state.scale=k; state.isMode=false; if(state.melody) generateMelody(); });
@@ -546,10 +602,13 @@ function setupControls(){
   techRow();
   btnRow('timbreBtns', Object.entries(TIMBRES).map(([k,v])=>({key:k,label:v.name})), k=>k===state.timbre, k=>{ state.timbre=k; if(state.melody) generateMelody(); });
   btnRow('rhythmBtns', Object.entries(RHYTHMS).map(([k,v])=>({key:k,label:v.name})), k=>k===state.rhythm, k=>{ state.rhythm=k; if(state.melody) generateMelody(); });
+  drumRow();
   const tempo=document.getElementById('tempo'), tv=document.getElementById('tempoVal');
   tempo.value=state.bpm; tv.textContent=state.bpm+' BPM';
   tempo.addEventListener('input',()=>{ state.bpm=+tempo.value; tv.textContent=state.bpm+' BPM'; tempoRow(); });
   tempoRow();
+  const dv=document.getElementById('drumVol'), dvv=document.getElementById('drumVolVal');
+  if(dv){ dv.value=Math.round(state.drumVol*100); if(dvv) dvv.textContent=dv.value+'%'; dv.addEventListener('input',()=>{ state.drumVol=(+dv.value)/100; if(dvv) dvv.textContent=dv.value+'%'; }); }
   btnRow('formBtns', Object.entries(FORMS).map(([k,v])=>({key:k,label:v.name})), k=>k===state.form, k=>{ state.form=k; if(state.melody) generateMelody(); });
   document.getElementById('meter').addEventListener('change',e=>{ state.beats=+e.target.value; if(state.melody) generateMelody(); });
   document.getElementById('distChk').addEventListener('change',e=>{ state.distortion=e.target.checked; });
