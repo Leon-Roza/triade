@@ -178,6 +178,7 @@
       </div>
     </div>
     <div class="ctl"><label>Repetições (chorus)</label><div class="row" id="chorusBtns"></div></div>
+    <div class="ctl"><label>Song Builder — música inteira (arranjo por estilo)</label><div class="row" id="songBtns"></div></div>
     <div class="ctl"><label>Editor de forma (seções / casas)</label>
       <div class="row" id="seqChips" style="margin-bottom:8px"></div>
       <div class="row" id="seqAdd"></div>
@@ -477,14 +478,19 @@ const DRUMS={
   valsa:{name:'Valsa',kick:[0],snare:[2,4],hat:[0,2,4]},
   bossa:{name:'Bossa',kick:[0,3],snare:[2,6],hat:[1,3,5,7]},
   samba:{name:'Samba',kick:[0,3,4],snare:[2,5,6],hat:[1,2,3,5,6,7]},
-  simples:{name:'Simples',kick:[0,4],snare:[2,6],hat:[0,2,4,6]}
+  simples:{name:'Simples',kick:[0,4],snare:[2,6],hat:[0,2,4,6]},
+  fourfloor:{name:'4x4 (dance)',kick:[0,2,4,6],snare:[2,6],hat:[1,3,5,7]},
+  psy:{name:'Psytrance',kick:[0,2,4,6],snare:[2,6],hat:[1,3,5,7]},
+  darkpsy:{name:'Dark Psy',kick:[0,2,4,6],snare:[2,6],hat:[0,1,2,3,4,5,6,7]},
+  metal:{name:'Metal',kick:[0,1,2,3,4,5,6,7],snare:[2,6],hat:[0,2,4,6]},
+  black:{name:'Black Metal',kick:[0,1,2,3,4,5,6,7],snare:[1,3,5,7],hat:[]}
 };
 const DENSITIES={simples:'Simples',media:'Média',rapida:'Rápida'};
 const REGISTERS={grave:{n:'Grave',oct:3},media:{n:'Média',oct:4},aguda:{n:'Aguda',oct:5}};
 const STYLES={cantavel:{n:'Cantável',leap:0.12},arpejado:{n:'Arpejado',leap:0.10,arp:true},saltos:{n:'Saltos',leap:0.55},pentatonica:{n:'Pentatônica',leap:0.2,min:true}};
 
 /* ================= ESTADO ================= */
-const state={ tonic:TONICS[0], scale:'maior', isMode:false, density:'media', register:'grave', style:'cantavel', form:'ternaria', tech:{pm:true,bend:true,slide:true,hp:true,vib:false,harm:false}, timbre:'nylon', rhythm:'baixoAcorde', drums:'rock', drumVol:0.75, mix:{melody:0.85,pad:0.45,bass:0.7}, pan:{melody:0,pad:0,bass:0,drums:0}, rev:0.18, humanize:false, swing:false, countIn:false, harmony:'off', ext:'triade', padInst:'synth', intro:false, ending:false, push:false, accents:false, reharm:false, chorus:1, formSeq:null, distortion:false, drive:0.55, bpm:90, beats:4, loop:true, melody:null };
+const state={ tonic:TONICS[0], scale:'maior', isMode:false, density:'media', register:'grave', style:'cantavel', form:'ternaria', tech:{pm:true,bend:true,slide:true,hp:true,vib:false,harm:false}, timbre:'nylon', rhythm:'baixoAcorde', drums:'rock', drumVol:0.75, mix:{melody:0.85,pad:0.45,bass:0.7}, pan:{melody:0,pad:0,bass:0,drums:0}, rev:0.18, humanize:false, swing:false, countIn:false, harmony:'off', ext:'triade', padInst:'synth', bassOff:false, intro:false, ending:false, push:false, accents:false, reharm:false, chorus:1, formSeq:null, distortion:false, drive:0.55, bpm:90, beats:4, loop:true, melody:null };
 
 /* ================= ESCALA / ACORDES ================= */
 function currentIntervals(){ return state.isMode?MODES[state.scale].intervals:SCALES[state.scale].intervals; }
@@ -520,7 +526,7 @@ function rel(a,b){ return ((b-a)%12+12)%12; }
 const REHARM={0:5,1:3,4:2};
 function sectionChords(letter){
   const pcs=buildScale().map(x=>x.pitch), n=pcs.length;
-  const pat=({A:[0,4],B:[5,3],C:[1,4],D:[0,5],I:[0,4],F:[4,0],'1':[4],'2':[0]})[letter]||[0,4];
+  const pat=({A:[0,4],B:[5,3],C:[5,2],D:[0,5],S:[5,3],I:[0,4],F:[4,0],'1':[4],'2':[0]})[letter]||[0,4];
   const sev = state.ext==='setima' && n>=7;
   return pat.map(d=>{
     let dd=d%n;
@@ -534,17 +540,19 @@ function sectionChords(letter){
   });
 }
 function genSection(letter,varIdx){
-  const style=STYLES[state.style]; let pool=buildScale().map(x=>x.pitch);
+  const solo=letter==='S'; const style=solo?{leap:0.42}:STYLES[state.style];
+  let pool=buildScale().map(x=>x.pitch);
   if(style.min){ const keep=[0,1,2,4,5]; pool=keep.map(i=>pool[i%pool.length]); }
-  const regOff=({A:0,B:1,D:1,C:-1,I:0,F:0,'1':0,'2':0}[letter]||0)+(varIdx?(varIdx%2):0);
+  const regOff=({A:0,B:1,D:1,C:-1,S:1,I:0,F:0,'1':0,'2':0}[letter]||0)+(varIdx?(varIdx%2):0);
   const baseOct=(REGISTERS[state.register]||REGISTERS.media).oct+regOff;
   const midis=[]; for(let o=baseOct;o<=baseOct+1;o++) pool.forEach(pc=>midis.push((o+1)*12+pc)); midis.sort((a,b)=>a-b);
-  const chords=sectionChords(letter), onsets=onsetsFor(state.beats,state.rhythm,state.density);
+  const dens=solo?'rapida':state.density;
+  const chords=sectionChords(letter), onsets=onsetsFor(state.beats,state.rhythm,dens);
   const notes=[]; let prev=midis[Math.floor(midis.length/2)];
   chords.forEach((chord,bar)=>{
     const tones=chord.pcs, tonesAsc=midis.filter(m=>tones.includes(m%12)).sort((a,b)=>a-b);
     onsets.forEach((beat,idx)=>{
-      if(idx>0 && Math.random()<(state.density==='rapida'?0.16:0.06)){ notes.push({beat,bar,rest:true}); return; }
+      if(idx>0 && Math.random()<(dens==='rapida'?0.16:0.06)){ notes.push({beat,bar,rest:true}); return; }
       const strong=Math.abs(beat-Math.round(beat))<1e-6&&(Math.round(beat)%2===0);
       let pick;
       if(style.arp){ pick=tonesAsc.length?tonesAsc[idx%tonesAsc.length]:prev; }
@@ -700,7 +708,7 @@ function playMelody(solo){
       } else if(acc && accent==='shot'){ timers.push(setTimeout(()=>playChord(midis,audioCtx.currentTime+0.01,0.12,hvel(0.11*state.mix.melody,opt),B('pad')), p0 + opt.off)); }
     }
     if(bassOn && c && accent!=='rest'){ const bp=c.notes.map(pcOf);
-      const map=(accent==='hold')? [[0,bp[0]]] : (sub? [[0,bp[0]],[2,bp[1]],[4,bp[2]],[6,bp[1]]] : [[0,bp[0]],[4,bp[0]]]);
+      const map=(accent==='hold')? [[0,bp[0]]] : (state.bassOff? [[1,bp[0]],[3,bp[0]],[5,bp[0]],[7,bp[0]]] : (sub? [[0,bp[0]],[2,bp[1]],[4,bp[2]],[6,bp[1]]] : [[0,bp[0]],[4,bp[0]]]));
       map.forEach(function(pr){ const ms=(pr[0]===0? p0 : bar*barMs+pr[0]*stepMs) + opt.off; timers.push(setTimeout(()=>{ if(audioCtx) playBassNote(36+pr[1],audioCtx.currentTime+0.01, stepMs/1000*1.7, hvel(0.17*state.mix.bass,opt), B('bass')); }, ms)); });
     }
     scheduleDrums(bar,barMs,stepMs,sub,opt);
@@ -765,21 +773,72 @@ function harmRow(){ const host=document.getElementById('harmBtns'); if(!host) re
 function currentSeq(){ return (state.formSeq && state.formSeq.length)? state.formSeq.slice() : ((FORMS[state.form]||FORMS.ternaria).sections||['A']).slice(); }
 function renderFormEditor(){
   const chips=document.getElementById('seqChips');
-  if(chips){ chips.innerHTML=''; currentSeq().forEach(function(L,i){ const b=document.createElement('button'); b.className='opt active'; b.textContent=L; b.title='clique para remover'; b.addEventListener('click',function(){ state.formSeq=currentSeq(); state.formSeq.splice(i,1); if(!state.formSeq.length) state.formSeq=null; renderFormEditor(); if(state.melody) generateMelody(); }); chips.appendChild(b); }); }
+  if(chips){ chips.innerHTML=''; currentSeq().forEach(function(L,i){ const b=document.createElement('button'); b.className='opt active'; b.textContent=(SECTION_NAMES[L]||L); b.title='clique para remover'; b.addEventListener('click',function(){ state.formSeq=currentSeq(); state.formSeq.splice(i,1); if(!state.formSeq.length) state.formSeq=null; renderFormEditor(); if(state.melody) generateMelody(); }); chips.appendChild(b); }); }
   const add=document.getElementById('seqAdd');
-  if(add){ add.innerHTML=''; [['A','A'],['B','B'],['C','C'],['D','D'],['I','Intro'],['F','Final'],['1','1ª casa'],['2','2ª casa']].forEach(function(it){ const b=document.createElement('button'); b.className='opt'; b.textContent='+ '+it[1]; b.addEventListener('click',function(){ state.formSeq=currentSeq(); state.formSeq.push(it[0]); renderFormEditor(); if(state.melody) generateMelody(); }); add.appendChild(b); }); const cl=document.createElement('button'); cl.className='opt'; cl.textContent='Limpar'; cl.addEventListener('click',function(){ state.formSeq=null; renderFormEditor(); if(state.melody) generateMelody(); }); add.appendChild(cl); }
+  if(add){ add.innerHTML=''; [['A','Verso'],['B','Refrão'],['C','Ponte'],['S','Solo'],['D','Interlúdio'],['I','Intro'],['F','Final'],['1','1ª casa'],['2','2ª casa']].forEach(function(it){ const b=document.createElement('button'); b.className='opt'; b.textContent='+ '+it[1]; b.addEventListener('click',function(){ state.formSeq=currentSeq(); state.formSeq.push(it[0]); renderFormEditor(); if(state.melody) generateMelody(); }); add.appendChild(b); }); const cl=document.createElement('button'); cl.className='opt'; cl.textContent='Limpar'; cl.addEventListener('click',function(){ state.formSeq=null; renderFormEditor(); if(state.melody) generateMelody(); }); add.appendChild(cl); }
 }
 function padRow(){ const host=document.getElementById('padBtns'); if(!host) return; host.innerHTML=''; [['synth','Synth'],['piano','Piano (samples)']].forEach(function(it){ const b=document.createElement('button'); b.className='opt'+(state.padInst===it[0]?' active':''); b.textContent=it[1]; b.addEventListener('click',function(){ state.padInst=it[0]; padRow(); }); host.appendChild(b); }); }
+function noteRow(){ btnRow('noteBtns', TONICS.map(t=>({key:t.label,label:t.label})), k=>k===state.tonic.label, k=>{ state.tonic=TONICS.find(t=>t.label===k); if(state.melody) generateMelody(); }); }
+function scaleRow(){ btnRow('scaleBtns', Object.entries(SCALES).map(([k,v])=>({key:k,label:v.name})), k=>!state.isMode&&k===state.scale, k=>{ state.scale=k; state.isMode=false; if(state.melody) generateMelody(); }); }
+function modeRow(){ btnRow('modeBtns', Object.entries(MODES).map(([k,v])=>({key:k,label:v.name})), k=>state.isMode&&k===state.scale, k=>{ state.scale=k; state.isMode=true; if(state.melody) generateMelody(); }, 'mode'); }
+function densityRow(){ btnRow('densityBtns', Object.entries(DENSITIES).map(([k,v])=>({key:k,label:v})), k=>k===state.density, k=>{ state.density=k; if(state.melody) generateMelody(); }); }
+function registerRow(){ btnRow('registerBtns', Object.entries(REGISTERS).map(([k,v])=>({key:k,label:v.n})), k=>k===state.register, k=>{ state.register=k; if(state.melody) generateMelody(); }); }
+function styleRow(){ btnRow('styleBtns', Object.entries(STYLES).map(([k,v])=>({key:k,label:v.n})), k=>k===state.style, k=>{ state.style=k; if(state.melody) generateMelody(); }); }
+function timbreRow(){ btnRow('timbreBtns', Object.entries(TIMBRES).map(([k,v])=>({key:k,label:v.name})), k=>k===state.timbre, k=>{ state.timbre=k; if(state.melody) generateMelody(); }); }
+function rhythmRow(){ btnRow('rhythmBtns', Object.entries(RHYTHMS).map(([k,v])=>({key:k,label:v.name})), k=>k===state.rhythm, k=>{ state.rhythm=k; if(state.melody) generateMelody(); }); }
+function chorusRow(){ btnRow('chorusBtns', [1,2,3,4].map(n=>({key:''+n,label:n+'x'})), k=>(''+state.chorus)===k, k=>{ state.chorus=+k; }); }
+function formRow(){ btnRow('formBtns', Object.entries(FORMS).map(([k,v])=>({key:k,label:v.name})), k=>k===state.form, k=>{ state.form=k; if(state.melody) generateMelody(); }); }
+function syncSliders(){ const t=document.getElementById('tempo'); if(t){ t.value=state.bpm; const tv=document.getElementById('tempoVal'); if(tv) tv.textContent=state.bpm+' BPM'; } const m=document.getElementById('meter'); if(m) m.value=String(state.beats); const dc=document.getElementById('distChk'); if(dc) dc.checked=state.distortion; }
+function refreshRows(){ noteRow(); scaleRow(); modeRow(); densityRow(); registerRow(); styleRow(); techRow(); timbreRow(); rhythmRow(); drumRow(); tempoRow(); extRow(); harmRow(); chorusRow(); formRow(); renderFormEditor(); padRow(); buildSongRow(); syncSliders(); }
+
+/* ================= SONG BUILDER ================= */
+const SECTION_NAMES={I:'Intro',A:'Verso',B:'Refrão',C:'Ponte',S:'Solo',D:'Interlúdio',F:'Final','1':'1ª casa','2':'2ª casa'};
+const SONGS=[
+  {name:'Pop', seq:['I','A','B','A','B','C','B','F'], cfg:{drums:'pop',dist:false,scale:'maior',bpm:100,ext:'setima',padInst:'piano',style:'cantavel',harmony:'3a+'}},
+  {name:'Rock', seq:['I','A','B','A','B','S','B','F'], cfg:{drums:'rock',dist:true,timbre:'eletrica',drive:0.5,scale:'maior',bpm:120}},
+  {name:'Rock & Roll', seq:['I','A','B','A','B','S','F'], cfg:{drums:'rock',dist:true,timbre:'eletrica',drive:0.4,scale:'maior',bpm:150,swing:true}},
+  {name:'Metal', seq:['I','A','B','A','S','B','F'], cfg:{drums:'metal',dist:true,timbre:'eletrica',drive:0.85,scale:'menorNat',bpm:160,density:'rapida',style:'saltos'}},
+  {name:'Black Metal', seq:['I','A','S','B','A','S','F'], cfg:{drums:'black',dist:true,timbre:'eletrica',drive:1.0,scale:'menorNat',bpm:185,density:'rapida',style:'saltos'}},
+  {name:'Psytrance', seq:['I','A','B','C','B','A','F'], cfg:{drums:'psy',dist:false,timbre:'eletrica',scale:'menorNat',bpm:145,density:'rapida',style:'arpejado',bassOff:true}},
+  {name:'Prog. Psy', seq:['I','A','B','A','B','A','F'], cfg:{drums:'psy',scale:'menorNat',bpm:138,density:'media',bassOff:true,style:'arpejado'}},
+  {name:'Dark Prog. Psy', seq:['I','A','B','C','B','C','A','F'], cfg:{drums:'darkpsy',scale:'menorHarm',bpm:140,density:'rapida',bassOff:true,style:'arpejado',timbre:'eletrica'}},
+  {name:'Trance melódico', seq:['I','A','B','A','S','B','F'], cfg:{drums:'fourfloor',scale:'menorNat',bpm:132,density:'rapida',bassOff:true,harmony:'8a+'}},
+  {name:'Balada', seq:['I','A','B','A','B','F'], cfg:{drums:'balada',scale:'maior',bpm:76,padInst:'piano',ext:'setima',humanize:true}},
+  {name:'Blues', seq:['I','A','A','B','A','S','F'], cfg:{drums:'simples',scale:'pentMenor',bpm:100,swing:true}}
+];
+function applySong(song){
+  state.formSeq=song.seq.slice(); const c=song.cfg||{};
+  if(c.drums) state.drums=c.drums;
+  if(c.dist!=null) state.distortion=c.dist;
+  if(c.timbre) state.timbre=c.timbre;
+  if(c.drive!=null) state.drive=c.drive;
+  if(c.scale){ if(SCALES[c.scale]){ state.scale=c.scale; state.isMode=false; } else if(MODES[c.scale]){ state.scale=c.scale; state.isMode=true; } }
+  if(c.bpm) state.bpm=c.bpm;
+  if(c.beats) state.beats=c.beats;
+  if(c.ext) state.ext=c.ext;
+  if(c.padInst) state.padInst=c.padInst;
+  if(c.style) state.style=c.style;
+  if(c.density) state.density=c.density;
+  if(c.harmony) state.harmony=c.harmony;
+  if(c.bassOff!=null) state.bassOff=c.bassOff;
+  if(c.humanize!=null) state.humanize=c.humanize;
+  if(c.swing!=null) state.swing=c.swing;
+  const hc=document.getElementById('humanChk'); if(hc) hc.checked=!!state.humanize;
+  const sc=document.getElementById('swingChk'); if(sc) sc.checked=!!state.swing;
+  refreshRows(); generateMelody(); toast('Arranjo "'+song.name+'" aplicado');
+}
+function buildSongRow(){ const host=document.getElementById('songBtns'); if(!host) return; host.innerHTML=''; SONGS.forEach(function(sg){ const b=document.createElement('button'); b.className='opt'; b.textContent=sg.name; b.addEventListener('click',function(){ applySong(sg); }); host.appendChild(b); }); }
+
 function setupControls(){
-  btnRow('noteBtns', TONICS.map(t=>({key:t.label,label:t.label})), k=>k===state.tonic.label, k=>{ state.tonic=TONICS.find(t=>t.label===k); if(state.melody) generateMelody(); });
-  btnRow('scaleBtns', Object.entries(SCALES).map(([k,v])=>({key:k,label:v.name})), k=>!state.isMode&&k===state.scale, k=>{ state.scale=k; state.isMode=false; if(state.melody) generateMelody(); });
-  btnRow('modeBtns', Object.entries(MODES).map(([k,v])=>({key:k,label:v.name})), k=>state.isMode&&k===state.scale, k=>{ state.scale=k; state.isMode=true; if(state.melody) generateMelody(); }, 'mode');
-  btnRow('densityBtns', Object.entries(DENSITIES).map(([k,v])=>({key:k,label:v})), k=>k===state.density, k=>{ state.density=k; if(state.melody) generateMelody(); });
-  btnRow('registerBtns', Object.entries(REGISTERS).map(([k,v])=>({key:k,label:v.n})), k=>k===state.register, k=>{ state.register=k; if(state.melody) generateMelody(); });
-  btnRow('styleBtns', Object.entries(STYLES).map(([k,v])=>({key:k,label:v.n})), k=>k===state.style, k=>{ state.style=k; if(state.melody) generateMelody(); });
+  noteRow();
+  scaleRow();
+  modeRow();
+  densityRow();
+  registerRow();
+  styleRow();
   techRow();
-  btnRow('timbreBtns', Object.entries(TIMBRES).map(([k,v])=>({key:k,label:v.name})), k=>k===state.timbre, k=>{ state.timbre=k; if(state.melody) generateMelody(); });
-  btnRow('rhythmBtns', Object.entries(RHYTHMS).map(([k,v])=>({key:k,label:v.name})), k=>k===state.rhythm, k=>{ state.rhythm=k; if(state.melody) generateMelody(); });
+  timbreRow();
+  rhythmRow();
   drumRow();
   const tempo=document.getElementById('tempo'), tv=document.getElementById('tempoVal');
   tempo.value=state.bpm; tv.textContent=state.bpm+' BPM';
@@ -798,9 +857,9 @@ function setupControls(){
   const rA=document.getElementById('revAmt'), rV=document.getElementById('revAmtVal'); if(rA){ rA.value=Math.round(state.rev*100); if(rV) rV.textContent=rA.value+'%'; rA.addEventListener('input',()=>{ state.rev=(+rA.value)/100; if(rV) rV.textContent=rA.value+'%'; applyReverb(); }); }
   const bChk=(id,key)=>{ const el=document.getElementById(id); if(!el) return; el.checked=!!state[key]; el.addEventListener('change',()=>{ state[key]=el.checked; if(state.melody) generateMelody(); }); };
   bChk('introChk','intro'); bChk('endChk','ending'); bChk('pushChk','push'); bChk('accentChk','accents'); bChk('reharmChk','reharm');
-  btnRow('chorusBtns', [1,2,3,4].map(n=>({key:''+n,label:n+'x'})), k=>(''+state.chorus)===k, k=>{ state.chorus=+k; });
-  renderFormEditor(); padRow();
-  btnRow('formBtns', Object.entries(FORMS).map(([k,v])=>({key:k,label:v.name})), k=>k===state.form, k=>{ state.form=k; if(state.melody) generateMelody(); });
+  chorusRow();
+  renderFormEditor(); padRow(); buildSongRow();
+  formRow();
   document.getElementById('meter').addEventListener('change',e=>{ state.beats=+e.target.value; if(state.melody) generateMelody(); });
   document.getElementById('distChk').addEventListener('change',e=>{ state.distortion=e.target.checked; });
   document.getElementById('genBtn').addEventListener('click', generateMelody);
