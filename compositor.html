@@ -66,6 +66,11 @@
   .saveditem .acts{display:flex;gap:7px;flex-wrap:wrap}
   .toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,20px);background:#12121f;border:1px solid var(--stroke);color:var(--txt);padding:12px 20px;border-radius:14px;font-size:13.5px;opacity:0;pointer-events:none;transition:.25s;z-index:70}
   .toast.show{opacity:1;transform:translate(-50%,0)}
+  .paywall{position:fixed;inset:0;background:rgba(4,4,10,.92);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;z-index:100;padding:24px;text-align:center}
+  .paywall .box{max-width:440px;background:#0d0d18;border:1px solid var(--stroke);border-radius:22px;padding:34px 28px}
+  .paywall h2{font-family:var(--display);font-size:22px;margin:12px 0 8px}
+  .paywall p{color:var(--muted);font-size:14px;line-height:1.6;margin-bottom:20px}
+  .paywall .row{justify-content:center}
   .loop-btn.active{border-color:transparent;color:#1a0f02;background:linear-gradient(135deg,var(--dom),#ffd0ac);font-weight:700}
   .hint{color:var(--muted);font-size:12.5px;line-height:1.6}
   .grp{border:1px solid var(--stroke);border-radius:16px;padding:8px 14px 14px;margin-top:14px;background:rgba(255,255,255,.02)}
@@ -206,8 +211,21 @@
   <footer>TRÍADE · Compositor · exporte a melodia em tablatura ou MIDI para sua DAW.</footer>
 </div>
 <div class="toast" id="toast"></div>
+<div class="paywall" id="paywall">
+  <div class="box">
+    <div class="mark" style="margin:0 auto"><span>C</span></div>
+    <h2>Recurso Pro</h2>
+    <p id="paywallMsg">O Modo Compositor faz parte do plano Pro.</p>
+    <div class="row">
+      <a class="btn primary" href="index.html#planos">Ver planos / Assinar</a>
+      <a class="btn" href="index.html">Entrar / Voltar</a>
+    </div>
+  </div>
+</div>
 
 <script>
+/* ================= CONTA (gate Pro) ================= */
+const CONFIG={ supabaseUrl:'https://hthidkthkgeyfxcevqkw.supabase.co', supabaseAnonKey:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0aGlka3Roa2dleWZ4Y2V2cWt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyMjM5NzksImV4cCI6MjEwNjc5OTk3OX0.URTePmZmInB7udA-y0l3osgtyeUWxoT9vRR4C5bmfW0' };
 /* ================= TEORIA ================= */
 const SHARP_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 const FLAT_NAMES=['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
@@ -829,6 +847,23 @@ function renderSaved(){
 /* ================= START ================= */
 setupControls();
 generateMelody();
+
+/* ================= GATE PRO ================= */
+let supa=null;
+function showPaywall(msg){ const el=document.getElementById('paywall'); if(!el) return; const m=document.getElementById('paywallMsg'); if(m && msg) m.textContent=msg; el.style.display='flex'; }
+(async function gate(){
+  if(!CONFIG.supabaseUrl || !CONFIG.supabaseAnonKey) return;
+  try{
+    const mod=await import('https://esm.sh/@supabase/supabase-js@2');
+    supa=mod.createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey);
+    const { data }=await supa.auth.getSession();
+    if(!data || !data.session){ showPaywall('Entre na sua conta para usar o Modo Compositor (plano Pro).'); return; }
+    const { data: prof }=await supa.from('profiles').select('plan,expires_at').eq('id', data.session.user.id).maybeSingle();
+    const plan=prof && prof.plan, exp=prof && prof.expires_at;
+    const ok=(plan==='pro'||plan==='studio') && (!exp || new Date(exp)>new Date());
+    if(!ok) showPaywall('O Modo Compositor faz parte do plano Pro. Faça upgrade para liberar.');
+  }catch(e){ /* se falhar, libera (fail-open) */ }
+})();
 </script>
 </body>
 </html>
