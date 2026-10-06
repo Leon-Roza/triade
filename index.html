@@ -275,6 +275,17 @@
   .mbar .mchord{font-family:var(--display);font-size:15px;min-width:46px;color:var(--accent,var(--tonica))}
   .mnote{font-size:13px;font-weight:700;padding:5px 9px;border-radius:8px;background:rgba(255,255,255,.06);border:1px solid var(--stroke);transition:.1s}
   .mnote.cur{background:var(--tonica);color:#05121a;border-color:transparent;transform:translateY(-2px)}
+
+  /* LEITOR DE TABLATURA (sincronizado) */
+  .tabview{margin-top:14px;background:#0a0a14;border:1px solid var(--stroke);border-radius:14px;padding:12px;overflow-x:auto;max-height:340px}
+  .tabview .tbar,.tabview .tabblock{padding:6px 8px;border-radius:10px;border:1px solid transparent;margin-bottom:6px}
+  .tabview .tbar.cur,.tabview .tabblock.cur{border-color:var(--tonica);background:rgba(34,211,238,.08)}
+  .tabview .tchord{font-family:var(--display);font-size:12.5px;color:var(--dom);margin-bottom:3px;letter-spacing:.4px}
+  .tabview .tline{font-family:ui-monospace,Consolas,monospace;font-size:13px;line-height:1.55;white-space:nowrap;color:#55556a}
+  .tabview .tstr{display:inline-block;width:1.2em;color:var(--muted)}
+  .tabview .tcell{display:inline-block;width:2.6ch;text-align:center;color:#55556a}
+  .tabview .tnote{color:var(--txt);font-weight:700;border-radius:5px}
+  .tabview .tnote.cur{background:var(--tonica);color:#05121a;box-shadow:0 0 10px rgba(34,211,238,.6)}
   .modal-bg{position:fixed;inset:0;background:rgba(3,3,8,.74);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;z-index:60;padding:20px}
   .modal-bg.open{display:flex}
   .modal{background:#0d0d18;border:1px solid var(--stroke);border-radius:22px;padding:28px;max-width:420px;width:100%;box-shadow:0 30px 80px rgba(0,0,0,.65)}
@@ -391,6 +402,7 @@
         <button class="btn" id="stopProgBtn" disabled>■ Parar</button>
         <button class="btn" id="saveProgBtn">💾 Salvar</button>
       </div>
+      <div class="tabview" id="progTab" style="display:none"></div>
     </div>
     <div class="panel">
       <h2>Ritmo &amp; andamento</h2>
@@ -446,6 +458,7 @@
       <button class="btn" id="exportMidiBtn">⬇ MIDI</button>
     </div>
     <div class="melody" id="melodyOut"></div>
+    <div class="tabview" id="melodyTab" style="display:none"></div>
   </section>
 
   <div class="grid-title" id="minhas">
@@ -515,6 +528,7 @@
         <button class="btn" id="detMidiBtn">⬇ MIDI</button>
       </div>
       <div class="chordlist" id="chordList"></div>
+      <div class="tabview" id="detTab" style="display:none"></div>
     </div>
   </section>
 
@@ -673,6 +687,7 @@ function build(){
   resolveProgression();
   state.melody = null;
   const mo0 = document.getElementById('melodyOut'); if(mo0) mo0.innerHTML = '';
+  const mt0 = document.getElementById('melodyTab'); if(mt0){ mt0.innerHTML = ''; mt0.style.display = 'none'; }
   setMelodyStatus('gere uma melodia sobre o campo harmônico');
   render();
 }
@@ -883,9 +898,11 @@ function renderProgression(){
   });
   document.getElementById('progName').textContent =
     state.progression.tpl + '  →  ' + current.progressionChords.map(c=>c.degree).join(' – ');
+  renderChordTab('progTab', current.progressionChords.map(c=>({name:c.pretty, notes:c.notes})));
 }
 function highlightProgression(bar){
   document.querySelectorAll('.pchip').forEach((el,i)=>el.classList.toggle('playing', i===bar));
+  highlightChordTab('progTab', (typeof bar==='number' && bar>=0) ? bar : -1);
 }
 
 /* ============ RITMOS ============ */
@@ -1144,6 +1161,7 @@ function stopProgression(){
   if(p) p.disabled = false;
   if(s) s.disabled = true;
   document.querySelectorAll('.pchip').forEach(e=>e.classList.remove('playing'));
+  clearTabHighlight('progTab');
   if(current.chords) renderFretboard(current.chords[state.selected]);
 }
 
@@ -1479,6 +1497,7 @@ function renderDetection(res){
     cl.appendChild(ci);
   });
   document.getElementById('detResult').style.display='block';
+  renderChordTab('detTab', res.segments.filter(s=>s.quality!=='N').map(s=>({name:segName(s)+'  ('+fmtTime(s.start)+')', notes:chordNotesOf(s.root,s.quality)})));
   startFollow();
 }
 
@@ -1534,6 +1553,7 @@ let detChordTimers=[];
 function stopDetCifra(){
   detChordTimers.forEach(clearTimeout); detChordTimers=[];
   const a=document.getElementById('detAudio'); try{ a.pause(); }catch(e){}
+  clearTabHighlight('detTab');
   const b=document.getElementById('playCifraBtn'); if(b) b.textContent='▶ Tocar cifra';
 }
 function playDetCifra(){
@@ -1545,8 +1565,9 @@ function playDetCifra(){
   try{ ensureCtx(); }catch(e){}
   try{ a.currentTime=0; a.play().catch(()=>{}); }catch(e){}
   const segs=lastDetection.segments.filter(s=>s.quality!=='N');
-  segs.forEach(s=>{
+  segs.forEach((s,i)=>{
     detChordTimers.push(setTimeout(()=>{
+      highlightChordTab('detTab', i);
       try{ playChordAt({notes:chordNotesOf(s.root,s.quality)}, audioCtx.currentTime+0.02, Math.max(0.4,(s.end-s.start)*0.95)); }catch(e){}
     }, Math.max(0, s.start*1000)));
   });
@@ -1656,10 +1677,12 @@ function renderMelody(){
     });
     out.appendChild(row);
   });
+  renderMelodyTab();
 }
 function stopMelody(){
   melodyTimers.forEach(clearTimeout); melodyTimers=[];
   document.querySelectorAll('.mnote.cur').forEach(e=>e.classList.remove('cur'));
+  clearTabHighlight('melodyTab');
   const pb=document.getElementById('playMelodyBtn'); if(pb) pb.disabled=false;
   const sb=document.getElementById('stopMelodyBtn'); if(sb) sb.disabled=true;
 }
@@ -1692,7 +1715,7 @@ function playMelody(solo){
         document.querySelectorAll('.mnote.cur').forEach(e=>e.classList.remove('cur'));
         const row=document.querySelectorAll('.mbar')[bar];
         if(row){ const els=row.querySelectorAll('.mnote'); if(els[idx]) els[idx].classList.add('cur'); }
-        if(!n.rest){ try{ pluckVoice(n.midi, audioCtx.currentTime+0.01, Math.min(0.95, beatMs/1000*0.95), 0.15); }catch(e){} }
+        if(!n.rest){ try{ pluckVoice(n.midi, audioCtx.currentTime+0.01, Math.min(0.95, beatMs/1000*0.95), 0.15); }catch(e){} if(n.tabIndex!=null) highlightMelodyTab(n.tabIndex); }
       }});
     });
   });
@@ -1894,6 +1917,81 @@ function loadMelodyFrom(p){
   const c=document.getElementById('compositor'); if(c) c.scrollIntoView({behavior:'smooth'});
   playMelody();
 }
+/* ===== Leitor de tablatura sincronizado ===== */
+function makeTabBlock(name, notes){
+  const order=[5,4,3,2,1,0], labels={5:'e',4:'B',3:'G',2:'D',1:'A',0:'E'};
+  const wrap=document.createElement('div'); wrap.className='tabblock';
+  const ch=document.createElement('div'); ch.className='tchord'; ch.textContent=name; wrap.appendChild(ch);
+  const smap={};
+  notes.forEach(n=>{ const p=noteToPosition(48+parsePC(n)); smap[p.s]=p.fret; });
+  order.forEach(si=>{
+    const line=document.createElement('div'); line.className='tline';
+    const str=document.createElement('span'); str.className='tstr'; str.textContent=labels[si]; line.appendChild(str);
+    line.appendChild(document.createTextNode('|'));
+    const cell=document.createElement('span'); cell.className='tcell';
+    if(smap[si]!=null){ cell.textContent=String(smap[si]); cell.classList.add('tnote'); } else cell.textContent='-';
+    line.appendChild(cell);
+    line.appendChild(document.createTextNode('|'));
+    wrap.appendChild(line);
+  });
+  return wrap;
+}
+function renderChordTab(hostId, items){
+  const host=document.getElementById(hostId); if(!host) return;
+  host.innerHTML='';
+  if(!items || !items.length){ host.style.display='none'; return; }
+  items.forEach((it,i)=>{ const b=makeTabBlock(it.name, it.notes); b.dataset.seg=i; host.appendChild(b); });
+  host.style.display='block';
+}
+function highlightChordTab(hostId, i){
+  const host=document.getElementById(hostId); if(!host) return;
+  host.querySelectorAll('.tabblock.cur').forEach(e=>e.classList.remove('cur'));
+  if(i<0) return;
+  const el=host.querySelector('.tabblock[data-seg="'+i+'"]');
+  if(el){ el.classList.add('cur'); el.scrollIntoView({block:'nearest',inline:'center'}); }
+}
+function renderMelodyTab(){
+  const host=document.getElementById('melodyTab'); if(!host) return;
+  host.innerHTML='';
+  if(!state.melody){ host.style.display='none'; return; }
+  const m=state.melody;
+  const order=[5,4,3,2,1,0], labels={5:'e',4:'B',3:'G',2:'D',1:'A',0:'E'};
+  let counter=0;
+  m.chords.forEach((c,bar)=>{
+    const notes=m.notes.filter(n=>n.bar===bar && !n.rest);
+    notes.forEach(n=>{ n.tabIndex=counter++; });
+    const wrap=document.createElement('div'); wrap.className='tbar'; wrap.dataset.bar=bar;
+    const ch=document.createElement('div'); ch.className='tchord'; ch.textContent=c.name; wrap.appendChild(ch);
+    order.forEach(si=>{
+      const line=document.createElement('div'); line.className='tline';
+      const str=document.createElement('span'); str.className='tstr'; str.textContent=labels[si]; line.appendChild(str);
+      line.appendChild(document.createTextNode('|'));
+      if(!notes.length){ const cell=document.createElement('span'); cell.className='tcell'; cell.textContent='-'; line.appendChild(cell); }
+      else notes.forEach(n=>{
+        const p=noteToPosition(n.midi);
+        const cell=document.createElement('span'); cell.className='tcell';
+        if(p.s===si){ cell.textContent=String(p.fret); cell.classList.add('tnote'); cell.dataset.note=n.tabIndex; }
+        else cell.textContent='-';
+        line.appendChild(cell);
+      });
+      line.appendChild(document.createTextNode('|'));
+      wrap.appendChild(line);
+    });
+    host.appendChild(wrap);
+  });
+  host.style.display='block';
+}
+function highlightMelodyTab(i){
+  const host=document.getElementById('melodyTab'); if(!host) return;
+  host.querySelectorAll('.tnote.cur').forEach(e=>e.classList.remove('cur'));
+  const el=host.querySelector('.tnote[data-note="'+i+'"]');
+  if(el){ el.classList.add('cur');
+    const bar=el.closest('.tbar');
+    if(bar){ host.querySelectorAll('.tbar.cur').forEach(b=>b.classList.remove('cur')); bar.classList.add('cur'); bar.scrollIntoView({block:'nearest',inline:'center'}); }
+  }
+}
+function clearTabHighlight(hostId){ const host=document.getElementById(hostId); if(host) host.querySelectorAll('.cur').forEach(e=>e.classList.remove('cur')); }
+
 function buildComposerControls(){
   const db=document.getElementById('densityBtns');
   Object.entries(DENSITIES).forEach(([k,v])=>{
