@@ -295,26 +295,39 @@ function drumHat(t,v,open){
   g.gain.setValueAtTime(v*0.55,t); g.gain.exponentialRampToValueAtTime(0.0001,t+dec);
   n.connect(hp).connect(g).connect(outputNode()); n.start(t); n.stop(t+dec+0.05);
 }
-const DRUM_FILES={ kick:'kick.m4a', kick2:'kick2.m4a', snare:'snare.m4a', snare2:'snare2.m4a', hhclosed:'hhclosed.m4a', hhopen:'hhopen.m4a', hhpedal:'hhpedal.m4a', crash:'crash.m4a', splash:'splash.m4a' };
+const DRUM_LAYERS={
+  kick:[['kick_v1.wav',0.35],['kick_v2.wav',0.65],['kick_v4.wav',1.0]],
+  snare:[['snare_v1.wav',0.35],['snare_v12.wav',0.65],['snare_v24.wav',1.0]],
+  hhclosed:[['hhclosed_v1.wav',0.5],['hhclosed_v3.wav',1.0]],
+  hhopen:[['hhopen_v1.wav',0.5],['hhopen_v3.wav',1.0]],
+  hhpedal:[['hhpedal_v1.wav',1.0]],
+  crash:[['crash_v1.wav',1.0]],
+  ride:[['ride_v1.wav',1.0]],
+  htom:[['htom_v4.wav',0.6],['htom_v12.wav',1.0]],
+  ltom:[['ltom_v4.wav',0.6],['ltom_v12.wav',1.0]],
+  splash:[['crash_v1.wav',1.0]]
+};
 const drumBuffers={}; let drumsReady=false, drumsLoading=false;
+function allDrumFiles(){ const set=new Set(); Object.values(DRUM_LAYERS).forEach(l=>l.forEach(x=>set.add(x[0]))); return Array.from(set); }
 async function loadDrums(){
   if(drumsReady||drumsLoading||!audioCtx) return; drumsLoading=true;
   try{
-    await Promise.all(Object.entries(DRUM_FILES).map(async ([k,f])=>{ const r=await fetch('samples/drums/'+f); const ab=await r.arrayBuffer(); drumBuffers[k]=await audioCtx.decodeAudioData(ab); }));
+    await Promise.all(allDrumFiles().map(async f=>{ const r=await fetch('samples/drums/'+f); const ab=await r.arrayBuffer(); drumBuffers[f]=await audioCtx.decodeAudioData(ab); }));
     drumsReady=true;
   }catch(e){ drumsReady=false; drumsLoading=false; }
 }
-function playDrumSample(name,t,vel){ const buf=drumBuffers[name]; if(!buf) return false; const src=audioCtx.createBufferSource(); src.buffer=buf; const g=audioCtx.createGain(); g.gain.value=Math.max(0,Math.min(1.3,vel)); src.connect(g).connect(outputNode()); try{ src.start(t); }catch(e){} return true; }
-function kickVoice(t,v){ if(!(drumsReady&&playDrumSample('kick',t,v))) drumKick(t,v); }
-function snareVoice(t,v){ if(!(drumsReady&&playDrumSample('snare',t,v))) drumSnare(t,v); }
-function hatVoice(t,v,open){ if(!(drumsReady&&playDrumSample(open?'hhopen':'hhclosed',t,v))) drumHat(t,v,open); }
+function nearestLayer(inst,vel){ const L=DRUM_LAYERS[inst]; if(!L) return null; let best=L[0], bd=Math.abs(L[0][1]-vel); L.forEach(x=>{ const d=Math.abs(x[1]-vel); if(d<bd){ bd=d; best=x; } }); return best[0]; }
+function playDrumByVel(inst,t,vel){ if(!drumsReady) return false; const file=nearestLayer(inst,vel); const buf=file&&drumBuffers[file]; if(!buf) return false; const src=audioCtx.createBufferSource(); src.buffer=buf; const g=audioCtx.createGain(); g.gain.value=Math.max(0,Math.min(1.2,state.drumVol)); src.connect(g).connect(outputNode()); try{ src.start(t); }catch(e){} return true; }
+function kickVoice(t,v){ if(!playDrumByVel('kick',t,v)) drumKick(t,v); }
+function snareVoice(t,v){ if(!playDrumByVel('snare',t,v)) drumSnare(t,v); }
+function hatVoice(t,v,open){ if(!playDrumByVel(open?'hhopen':'hhclosed',t,v)) drumHat(t,v,open); }
 function scheduleDrums(bar,barMs,stepMs){
-  if(state.drums==='off') return; const pat=DRUMS[state.drums]; if(!pat) return; const grid=state.beats*2, dv=state.drumVol;
+  if(state.drums==='off') return; const pat=DRUMS[state.drums]; if(!pat) return; const grid=state.beats*2;
   for(let s=0;s<grid;s++){
     const t=bar*barMs+s*stepMs;
-    if((pat.kick||[]).includes(s)) timers.push(setTimeout(()=>kickVoice(audioCtx.currentTime+0.01,0.95*dv),t));
-    if((pat.snare||[]).includes(s)) timers.push(setTimeout(()=>snareVoice(audioCtx.currentTime+0.01,0.85*dv),t));
-    if((pat.hat||[]).includes(s)){ const open=(s%2===1); timers.push(setTimeout(()=>hatVoice(audioCtx.currentTime+0.01,(s%2===0?0.55:0.4)*dv,open),t)); }
+    if((pat.kick||[]).includes(s)) timers.push(setTimeout(()=>kickVoice(audioCtx.currentTime+0.01,0.95),t));
+    if((pat.snare||[]).includes(s)) timers.push(setTimeout(()=>snareVoice(audioCtx.currentTime+0.01,0.85),t));
+    if((pat.hat||[]).includes(s)){ const open=(s%2===1); timers.push(setTimeout(()=>hatVoice(audioCtx.currentTime+0.01,(s%2===0?0.6:0.45),open),t)); }
   }
 }
 function playChord(midiArr,t,dur,vel){ midiArr.forEach((m,i)=>pluckVoice(m,t+i*0.006,Math.min(dur,2.2),vel)); }
@@ -551,7 +564,7 @@ function playMelody(solo){
       });
     }
     scheduleDrums(bar,barMs,stepMs);
-    if(secBars.has(bar)) timers.push(setTimeout(()=>{ if(drumsReady) playDrumSample('splash',audioCtx.currentTime+0.01,0.75*state.drumVol); },bar*barMs));
+    if(secBars.has(bar)) timers.push(setTimeout(()=>{ if(drumsReady) playDrumByVel('splash',audioCtx.currentTime+0.01,0.9); },bar*barMs));
   }
   schedNotes(m.notes,1);
   if(m.imitation) schedNotes(m.imitation,0.6);

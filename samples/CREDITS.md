@@ -1,26 +1,26 @@
 # Créditos dos samples
 
-Bateria do Modo Compositor (`samples/drums/`).
+Bateria do Modo Compositor (`samples/drums/`, formato `.wav`).
 
-## Origem
-- **Sonic Pi sample library** (formato `.ogg`/`.m4a`), compilada e redistribuída em
-  [danigb/samples](https://github.com/danigb/samples) — “áudio servido pelo GitHub Pages”,
-  composto por samples de licenças permissivas.
-- Os samples originais da Sonic Pi fazem parte do projeto **Sonic Pi** e de suas fontes
-  (a biblioteca de samples é distribuída para uso livre).
+## Origem e licença
+- **Virtuosity Drums** — por **Versilian Studios** & **Karoryfer Samples**.
+- **Licença: CC0 1.0 Universal (Domínio Público)** — livre para uso pessoal e comercial.
+- Repositório: https://github.com/sfzinstruments/virtuosity_drums
 
-## Arquivos usados
-| Arquivo | Origem (sample-pi) | Uso |
+Os arquivos foram extraídos do conjunto de microfone **mid**, convertidos de FLAC para **WAV**
+(mono) e recortados (sem silêncio excedente), preservando as camadas de intensidade.
+
+## Arquivos usados (camadas de intensidade)
+| Instrumento | Arquivos | Fonte |
 |---|---|---|
-| kick.m4a | kick/drum_bass_hard | bumbo |
-| kick2.m4a | kick/drum_heavy_kick | bumbo (alternativo) |
-| snare.m4a | snare/drum_snare_hard | caixa |
-| snare2.m4a | snare/drum_snare_soft | caixa (fantasma) |
-| hhclosed.m4a | cymbal/drum_cymbal_closed | chimbal fechado |
-| hhopen.m4a | cymbal/drum_cymbal_open | chimbal aberto |
-| hhpedal.m4a | cymbal/drum_cymbal_pedal | chimbal com pedal |
-| crash.m4a | cymbal/drum_cymbal_hard | prato |
-| splash.m4a | other/drum_splash_hard | splash (início de seção) |
+| Bumbo | kick_v1, kick_v2, kick_v4 | mid/kick/snon |
+| Caixa | snare_v1, snare_v12, snare_v24 | mid/snare/center |
+| Chimbal fechado | hhclosed_v1, hhclosed_v3 | mid/hh/closed |
+| Chimbal aberto | hhopen_v1, hhopen_v3 | mid/hh/open |
+| Chimbal (pedal) | hhpedal_v1 | mid/hh/pedal |
+| Prato de ataque | crash_v1 | mid/crash |
+| Condução (ride) | ride_v1 | mid/ride |
+| Tom agudo | htom_v4, htom_v12 | mid/htom/center |
+| Tom grave | ltom_v4, ltom_v12 | mid/ltom/center |
 
-> Se você for usar comercialmente, confirme a licença original na fonte (Sonic Pi samples /
-> danigb/samples). Se preferir 100% CC0, podemos trocar por um kit CC0 (ex.: Virtuosity Drums).
+O compositor escolhe a amostra pela **intensidade** (velocidade) de cada batida.
