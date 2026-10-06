@@ -2036,18 +2036,28 @@ function renderStaff(hostId, events){
   while(svg.firstChild) svg.removeChild(svg.firstChild);
   if(!events || !events.length){ host.style.display='none'; return; }
   host.style.display='block';
-  const space=12, topLine=50, ppb=46, startX=70;
+  const gap=13, top=36, ppb=46, startX=78;
+  const rows=[0,1,2,3,4,5].map(r=>top+r*gap);           // row0 = corda aguda (e, topo) ... row5 = grave (E)
+  const labels=['e','B','G','D','A','E'];
   let w=startX+40; events.forEach(e=>{ w+=Math.max(ppb*(e.durBeats||1),44); });
-  const H=170;
+  const H=top+5*gap+26;
   svg.setAttribute('width', w); svg.setAttribute('height', H); svg.setAttribute('viewBox','0 0 '+w+' '+H);
-  for(let i=0;i<5;i++){ const y=topLine+i*space; svg.appendChild(svgEl('line',{x1:8,y1:y,x2:w-8,y2:y,stroke:'#3a3a4a','stroke-width':1})); }
-  const g=svgEl('g',{transform:'translate(10,30) scale(1.913)',fill:'#e9e9f2'}); g.appendChild(svgEl('path',{d:CLEF_PATH})); svg.appendChild(g);
-  const t1=svgEl('text',{x:50,y:70,'font-size':20,'font-weight':700,fill:'#e9e9f2','text-anchor':'middle'}); t1.textContent=String(player.beats||4); svg.appendChild(t1);
-  const t2=svgEl('text',{x:50,y:96,'font-size':20,'font-weight':700,fill:'#e9e9f2','text-anchor':'middle'}); t2.textContent='4'; svg.appendChild(t2);
+  rows.forEach(y=> svg.appendChild(svgEl('line',{x1:10,y1:y,x2:w-8,y2:y,stroke:'#3a3a4a','stroke-width':1.2})));
+  labels.forEach((lb,r)=>{ const t=svgEl('text',{x:58,y:rows[r]+4,'font-size':12,fill:'#8a8aa3','text-anchor':'middle','font-family':'ui-monospace,monospace'}); t.textContent=lb; svg.appendChild(t); });
+  const midY=(rows[0]+rows[5])/2;
+  const tabT=svgEl('text',{x:midY+22,y:15,'font-size':13,'font-weight':700,fill:'#e9e9f2','font-family':'ui-monospace,monospace',transform:'rotate(-90 22 '+midY+')'}); tabT.textContent='T A B'; svg.appendChild(tabT);
+  const bpmT=svgEl('text',{x:26,y:rows[0]-14,'font-size':11,fill:'#8a8aa3','font-family':'ui-monospace,monospace'}); bpmT.textContent='♩= '+(player.bpm||90); svg.appendChild(bpmT);
   const xs=[]; let cursor=startX;
   events.forEach(ev=>{
     xs.push(cursor);
-    (ev.notes||[]).forEach(n=> drawNote(svg, cursor, n.letter, n.octave, n.acc, ev.durBeats||1));
+    (ev.notes||[]).forEach(nt=>{
+      const p=noteToPosition(nt.midi);
+      const row=5-p.s;                                   // s: 0=grave(E) ... 5=aguda(e)
+      const y=rows[row]!=null?rows[row]:rows[5];
+      svg.appendChild(svgEl('rect',{x:cursor-9,y:y-8,width:18,height:16,rx:5,fill:'rgba(34,211,238,.12)'}));
+      const t=svgEl('text',{x:cursor,y:y+4,'font-size':12.5,'font-weight':700,fill:'#e9e9f2','text-anchor':'middle','font-family':'ui-monospace,monospace'});
+      t.textContent=String(p.fret); svg.appendChild(t);
+    });
     cursor += Math.max(ppb*(ev.durBeats||1),44);
   });
   SCORE_XS[hostId]=xs;
@@ -2066,14 +2076,14 @@ function melodyEvents(){
   const evs=[];
   m.chords.forEach((c,bar)=>{
     const notes=m.notes.filter(n=>n.bar===bar && !n.rest).sort((a,b)=>a.beat-b.beat);
-    notes.forEach((n,i)=>{ const next=notes[i+1]; let db=next?(next.beat-n.beat):(m.beats-n.beat); if(!(db>0)) db=1; evs.push({notes:[nameToPart(n.name,n.midi)], durBeats:db}); });
+    notes.forEach((n,i)=>{ const next=notes[i+1]; let db=next?(next.beat-n.beat):(m.beats-n.beat); if(!(db>0)) db=1; evs.push({notes:[{midi:n.midi}], durBeats:db}); });
   });
   return evs;
 }
-function progEvents(){ if(!current.progressionChords) return []; return current.progressionChords.map(c=>({notes:c.notes.map(n=>pcToPart(n,4)), durBeats:player.beats||4})); }
+function progEvents(){ if(!current.progressionChords) return []; return current.progressionChords.map(c=>({notes:c.notes.map(n=>({midi:48+parsePC(n)})), durBeats:player.beats||4})); }
 function detEvents(){
   if(!lastDetection) return [];
-  return lastDetection.segments.filter(s=>s.quality!=='N').map(s=>({ notes:chordNotesOf(s.root,s.quality).map(n=>pcToPart(n,4)), durBeats:Math.max(1,(s.end-s.start)*(player.bpm/60)) }));
+  return lastDetection.segments.filter(s=>s.quality!=='N').map(s=>({ notes:chordNotesOf(s.root,s.quality).map(n=>({midi:48+parsePC(n)})), durBeats:Math.max(1,(s.end-s.start)*(player.bpm/60)) }));
 }
 
 function buildComposerControls(){
