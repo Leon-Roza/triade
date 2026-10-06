@@ -337,6 +337,7 @@
       </div>
     </div>
     <div class="tempo"><span class="dot"></span> escolha o tom e toque</div>
+    <a class="btn header-cta" href="compositor.html">Compositor</a>
     <a class="btn header-cta" href="#planos">Ver planos</a>
     <button class="btn header-acc" id="accountBtn">Entrar</button>
   </header>
@@ -435,40 +436,11 @@
 
   <div class="grid-title" id="compositor">
     <h2>Modo compositor</h2>
-    <span id="melodyStatus">gere uma melodia sobre o campo harmônico</span>
+    <span>melodias com escalas, modos, dinâmica e tablatura</span>
   </div>
-  <section class="composer panel">
-    <div class="composer-controls">
-      <div class="ctl">
-        <label>Densidade</label>
-        <div class="rhythms" id="densityBtns"></div>
-      </div>
-      <div class="ctl">
-        <label>Registro</label>
-        <div class="rhythms" id="registerBtns"></div>
-      </div>
-      <div class="ctl">
-        <label>Estilo</label>
-        <div class="rhythms" id="styleBtns"></div>
-      </div>
-      <div class="ctl">
-        <label>Opções</label>
-        <label class="check"><input type="checkbox" id="accChk" checked /> Tocar acompanhamento (acordes)</label>
-      </div>
-    </div>
-    <div class="prog-actions">
-      <button class="btn primary" id="genMelodyBtn">🎼 Gerar melodia</button>
-      <button class="btn" id="variationBtn">🔀 Variação</button>
-      <button class="btn" id="playMelodyBtn">▶ Tocar</button>
-      <button class="btn" id="playMelodySoloBtn">▶ Só melodia</button>
-      <button class="btn" id="stopMelodyBtn" disabled>■ Parar</button>
-      <button class="btn" id="saveMelodyBtn">💾 Salvar</button>
-      <button class="btn" id="exportTabBtn">⬇ Tab</button>
-      <button class="btn" id="exportMidiBtn">⬇ MIDI</button>
-      <button class="btn loop-btn" id="loopMelodyBtn">🔁 Loop</button>
-    </div>
-    <div class="melody" id="melodyOut"></div>
-    <div class="score" id="melodyScore" style="display:none"><div class="score-scroll"><svg class="score-svg"></svg></div><div class="score-hl"></div></div>
+  <section class="panel" style="text-align:center">
+    <p class="hint" style="margin-bottom:14px">O compositor completo — escalas, modos gregos, dinâmica, tablatura rolante e export MIDI — agora tem uma <b>página dedicada</b>.</p>
+    <a class="btn primary" href="compositor.html">🎼 Abrir o Compositor →</a>
   </section>
 
   <div class="grid-title" id="minhas">
@@ -2451,7 +2423,6 @@ function setupLoop(){
 buildControls();
 buildProgressionControls();
 buildSoundControls();
-buildComposerControls();
 setupDetector();
 setupLoop();
 setupPlans();
