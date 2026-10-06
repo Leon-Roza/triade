@@ -18,8 +18,8 @@
 - **Detector de harmonia** por upload de áudio (FFT → chroma → Viterbi) com timeline,
   tonalidade detectada, **Salvar cifra** e **▶ Tocar** a cifra salva.
 - **Planos** (Grátis / Pro / Studio), conta, salvar progressões e exportar (cifra/PDF/JSON).
-- **Modo compositor**: gera uma melodia sobre o campo harmônico (densidade simples/média/rápida,
-  registro grave/médio/agudo, acompanhamento dos acordes), com `▶ Tocar`, **Salvar** e export `.txt`.
+- **Modo compositor** (agora em página própria `compositor.html`) — ver seção 6.
+- **Bateria/baixo com samples reais CC0** (Virtuosity Drums + baixo pizzicato dsmolken).
 
 ---
 
@@ -143,3 +143,45 @@ e restaurar o token de produção.
 | Resend API key | Render/Supabase SMTP (pass) e painel Resend |
 | Render API key | painel Render |
 | Senha do banco | painel Supabase (redefinível) |
+
+---
+
+## 9. Compositor (`compositor.html`) — recursos
+
+Página dedicada (link no cabeçalho do site e card "Modo compositor"). Reproduz a melodia
+com banda de acompanhamento, com features inspiradas no **Band-in-a-Box**.
+
+**Teoria e melodia**
+- Tonalidade (12), **Escalas** (maior, menor natural/harmônica/melódica, pentatônicas, blues, cromática)
+  e **Modos gregos** (jônio, dórico, frígio, lídio, mixolídio, eólio, lócrio).
+- **Técnicas de guitarra**: palm mute, bend, slide, hammer/pull, vibrato, harmônico (no som, na tab e no MIDI).
+- **Harmonia da melodia** (voz diatônica): 3ª/6ª/8ª acima/abaixo.
+- Densidade, registro, estilo (cantável/arpejado/saltos/pentatônica).
+- **Acordes**: Tríades ou **Sétimas** (7M/7/m7/m7b5). Botão **Reharmonizar** (substituições diatônicas).
+
+**Forma e arranjo**
+- **Formas**: Unária, Binária, Ternária, Rondó, Tema e Variações, Cânone, Invenção, Fuga, Prelúdio,
+  Fantasia, Tocata, Poema Sinfônico, Rapsódia, Sonata, Sinfonia/Suíte.
+- **Intro/Final** de 2 compassos; **Push** (antecipação); **Acentos** (holds/rests/shots por compasso);
+  **Repetições (chorus)** 1–4x; **sub-estilos A/B** (seções B/C/D mais cheias).
+- Letras de seção (A/B/C/I/F) marcadas na tablatura.
+
+**Banda, groove e mix**
+- Instrumentos: **melodia** (guitarra Karplus-Strong), **pad/teclado** (synth), **baixo** (samples CC0
+  dsmolken pizzicato), **bateria** (samples CC0 Virtuosity Drums, com camadas de intensidade).
+- **Mixer**: volume por trilha + **Pan** por trilha + **Reverb** (bus com convolução).
+- **Humanizar** (variação de tempo/intensidade), **Swing**, **Contagem** (count-in).
+- **Andamento** (Largo→Presto + slider), **Compasso** (4/4, 3/4, 2/4), **Loop**.
+
+**Som e saída**
+- Síntese de corda (Karplus-Strong) para guitarra/violão, com **distorção**.
+- **Tablatura horizontal rolante** (estilo Guitar Pro) com acordes, casas e marcadores de técnica.
+- **Export**: Tab (`.txt`) e **MIDI** (4 trilhas: melodia, acompanhamento, e percussão no canal 10).
+- Composições salvas (localStorage `triade_comps`).
+
+**Samples (CC0)** — ver `samples/CREDITS.md`:
+- `samples/drums/*.wav` — Virtuosity Drums (bumbo, caixa, chimbais, pratos, tons) em camadas.
+- `samples/bass/*.wav` — dsmolken double-bass pizzicato (11 notas, mapeadas por afinação).
+
+**Próximos possíveis (ainda não feitos):** editor visual da forma com casas 1ª/2ª, estilo/banda nomeados,
+mais RealTracks (piano, cordas, etc.), notação em partitura além da tablatura.
