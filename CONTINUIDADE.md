@@ -169,7 +169,11 @@ com banda de acompanhamento, com features inspiradas no **Band-in-a-Box**.
 **Banda, groove e mix**
 - Instrumentos: **melodia** (guitarra Karplus-Strong), **pad/teclado** (synth **ou piano amostrado CC0**),
   **baixo** (samples CC0 dsmolken pizzicato), **bateria** (samples CC0 Virtuosity Drums, com camadas).
-- **Editor de forma**: sequência de seções editável (A/B/C/D/Intro/Final) + **casas 1ª/2ª** (fim alternativo).
+- **Editor de forma**: sequência de seções editável (Verso/Refrão/Ponte/Solo/Intro/Final) + **casas 1ª/2ª** (fim alternativo).
+- **Song Builder**: arranjos completos por estilo — Pop, Rock, Rock & Roll, Metal, **Black Metal**, **Psytrance**,
+  **Progressive Psy**, **Dark Progressive Psy**, Trance melódico, Balada e Blues — com estrutura
+  (intro/verso/refrão/ponte/solo/final), **bateria de gênero** (4x4, psy, dark psy, metal, blast beat) e
+  **baixo offbeat** (rolling bass) no psy/trance.
 - **Mixer**: volume por trilha + **Pan** por trilha + **Reverb** (bus com convolução).
 - **Humanizar** (variação de tempo/intensidade), **Swing**, **Contagem** (count-in).
 - **Andamento** (Largo→Presto + slider), **Compasso** (4/4, 3/4, 2/4), **Loop**.
